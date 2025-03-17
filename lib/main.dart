@@ -42,6 +42,8 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   Random random = Random();
   int score = 0;
   int combo = 0;
+  int maxCombo = 0;
+  String currentRating = "Beginner";
   Timer? gameTimer;
   List<Arrow> arrows = [];
   
@@ -49,6 +51,14 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   final double perfectZone = 0.05; // ±5% of center
   final double goodZone = 0.10;    // ±10% of center
   final double badZone = 0.15;     // ±15% of center
+  
+  // Define fixed lane positions for precise alignment
+  final Map<Direction, double> lanePositions = {
+    Direction.left: 80.0,
+    Direction.down: 160.0,
+    Direction.up: 240.0,
+    Direction.right: 320.0,
+  };
   
   // Reference for last Bluetooth inputs
   Direction? lastInput;
@@ -91,10 +101,25 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     });
   }
   
+  // Calculate player rating based on score and combo
+  String calculateRating() {
+    if (score >= 10000 && maxCombo >= 50) {
+      return "Champion";
+    } else if (score >= 5000 && maxCombo >= 30) {
+      return "Master";
+    } else if (score >= 2500 && maxCombo >= 20) {
+      return "Pro";
+    } else if (score >= 1000 && maxCombo >= 10) {
+      return "Amateur";
+    } else {
+      return "Beginner";
+    }
+  }
+  
   // Simulate processing incoming Bluetooth data
   void simulateBluetoothData() {
     // Randomly simulate button presses
-    if (random.nextInt(3) > 0) { // 2/3 chance of input
+    if (random.nextInt(4) > 0) { // 2/3 chance of input
       Direction input = Direction.values[random.nextInt(Direction.values.length)];
       checkHit(input);
     }
@@ -123,7 +148,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
       setState(() {
         hitArrow!.isHit = true;
         
-        // Calculate rating based on timing accuracy - only PERFECT or GOOD
+        // Calculate rating based on timing accuracy
         HitRating rating;
         if (closestDistance < perfectZone) {
           rating = HitRating.perfect;
@@ -134,6 +159,14 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
           score += 50 * (combo + 1);
           combo++;
         }
+        
+        // Update max combo
+        if (combo > maxCombo) {
+          maxCombo = combo;
+        }
+        
+        // Update player rating
+        currentRating = calculateRating();
         
         // Store the hit rating with the arrow
         hitArrow!.hitRating = rating;
@@ -235,11 +268,52 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     );
   }
 
+  // Rating badge widget
+  Widget _buildRatingBadge() {
+    Color ratingColor;
+    switch (currentRating) {
+      case "Champion":
+        ratingColor = Colors.deepPurple;
+        break;
+      case "Master":
+        ratingColor = Colors.redAccent;
+        break;
+      case "Pro":
+        ratingColor = Colors.blueAccent;
+        break;
+      case "Amateur":
+        ratingColor = Colors.green;
+        break;
+      default:
+        ratingColor = Colors.grey;
+    }
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: ratingColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: ratingColor.withOpacity(0.6),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Text(
+        currentRating,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final double arrowSpacing = 80.0;
-    
     // Calculate if we should show the hit feedback
     bool showHitFeedback = DateTime.now().millisecondsSinceEpoch - lastHitTime < 800;
     
@@ -285,26 +359,12 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                     // Calculate vertical position - map from 0.0-1.0 to bottom-top of game area
                     double top = 550 - (arrow.position * 460);
                     
-                    // Calculate horizontal position based on direction
-                    double left;
-                    switch (arrow.direction) {
-                      case Direction.left:
-                        left = 400/2 - arrowSpacing*1.5;
-                        break;
-                      case Direction.down:
-                        left = 400/2 - arrowSpacing/2;
-                        break;
-                      case Direction.up:
-                        left = 400/2 + arrowSpacing/2;
-                        break;
-                      case Direction.right:
-                        left = 400/2 + arrowSpacing*1.5;
-                        break;
-                    }
+                    // Get fixed position from lanePositions
+                    double left = lanePositions[arrow.direction]! - 32.5;
                     
                     return Positioned(
                       top: top - 32.5, // Center arrow vertically
-                      left: left - 32.5, // Center arrow horizontally
+                      left: left,      // Use fixed lane position
                       child: arrowWidget(
                         arrow.direction, 
                         isHit: arrow.isHit,
@@ -313,23 +373,13 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                     );
                   }),
                   
-                  // Target zones at top - exact same positioning
-                  Positioned(
-                    top: 90 - 35, // Center the targets on the hit line
-                    left: 0,
-                    right: 0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        arrowWidget(Direction.left, isTarget: true),
-                        SizedBox(width: arrowSpacing - 70),
-                        arrowWidget(Direction.down, isTarget: true),
-                        SizedBox(width: arrowSpacing - 70),
-                        arrowWidget(Direction.up, isTarget: true),
-                        SizedBox(width: arrowSpacing - 70),
-                        arrowWidget(Direction.right, isTarget: true),
-                      ],
-                    ),
+                  // Target zones - using the same lane positions for perfect alignment
+                  ...Direction.values.map((direction) => 
+                    Positioned(
+                      top: 90 - 35, // Center the targets on the hit line
+                      left: lanePositions[direction]! - 35,
+                      child: arrowWidget(direction, isTarget: true)
+                    )
                   ),
                   
                   // Hit feedback text
@@ -372,15 +422,67 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                         ),
                       ),
                     ),
-                  
-                  // Rest of UI elements remain unchanged
-                  
-                  // ...existing code...
                 ],
               ),
             ),
             
-            // Score and combo display remain unchanged
+            // Score and combo display
+            Container(
+              width: 400,
+              margin: EdgeInsets.only(top: 16),
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purpleAccent, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purpleAccent.withOpacity(0.3),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Score: $score', 
+                        style: TextStyle(
+                          fontSize: 20, 
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
+                      Text(
+                        'Combo: $combo', 
+                        style: TextStyle(
+                          fontSize: 20, 
+                          color: combo > 10 ? Colors.greenAccent : Colors.white,
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Max Combo: $maxCombo', 
+                        style: TextStyle(
+                          fontSize: 16, 
+                          color: Colors.amberAccent
+                        )
+                      ),
+                      _buildRatingBadge(),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -400,6 +502,8 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
         // Miss condition
         if (arrow.position > 1.2 && !arrow.isHit) {
           combo = 0;
+          // Update rating after breaking combo
+          currentRating = calculateRating();
           return true;
         }
         
