@@ -11,18 +11,19 @@ enum HitRating { perfect, good, bad, miss }
 
 class Arrow {
   final Direction direction;
+  final int number; // Number displayed on the arrow
   double position = 0.0; // 0.0 = bottom, 1.0 = top target
   bool isHit = false;
   HitRating? hitRating;
   
-  Arrow(this.direction);
+  Arrow(this.direction, this.number);
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'DDR Simulator',
+      title: 'Math DDR Simulator',
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.purple,
@@ -46,6 +47,12 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   String currentRating = "Beginner";
   Timer? gameTimer;
   List<Arrow> arrows = [];
+  
+  // Math equation variables
+  int firstNumber = 0;
+  int secondNumber = 0;
+  int correctAnswer = 0;
+  bool lastAnswerCorrect = true;
   
   // Target zone ranges (percentage of lane height)
   final double perfectZone = 0.05; // ±5% of center
@@ -71,13 +78,16 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   void initState() {
     super.initState();
     
+    // Generate initial math equation
+    generateMathEquation();
+    
     // Start game loop - updates 30 times per second
     gameTimer = Timer.periodic(Duration(milliseconds: 33), (timer) {
       updateGame();
     });
     
-    // Generate new arrows regularly
-    Timer.periodic(Duration(milliseconds: 700), (timer) {
+    // Generate new arrows less frequently (for easier gameplay)
+    Timer.periodic(Duration(milliseconds: 3500), (timer) {
       generateArrow();
     });
     
@@ -93,33 +103,54 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     super.dispose();
   }
   
+  // Generate a new math addition equation
+  void generateMathEquation() {
+    setState(() {
+      firstNumber = random.nextInt(9) + 1; // 1-9
+      secondNumber = random.nextInt(9) + 1; // 1-9
+      correctAnswer = firstNumber + secondNumber;
+    });
+  }
+  
   void generateArrow() {
     setState(() {
       // Random direction
       Direction dir = Direction.values[random.nextInt(Direction.values.length)];
-      arrows.add(Arrow(dir));
+      
+      // Generate a number for the arrow
+      int number;
+      if (random.nextDouble() < 0.3) { // 30% chance of correct answer
+        number = correctAnswer;
+      } else {
+        // Generate a random number that is not the correct answer
+        do {
+          number = random.nextInt(18) + 1; // Possible sums of single digits go up to 18 (9+9)
+        } while (number == correctAnswer);
+      }
+      
+      arrows.add(Arrow(dir, number));
     });
   }
   
   // Calculate player rating based on score and combo
   String calculateRating() {
     if (score >= 10000 && maxCombo >= 50) {
-      return "Champion";
+      return "Math Champion";
     } else if (score >= 5000 && maxCombo >= 30) {
-      return "Master";
+      return "Math Master";
     } else if (score >= 2500 && maxCombo >= 20) {
-      return "Pro";
+      return "Math Pro";
     } else if (score >= 1000 && maxCombo >= 10) {
-      return "Amateur";
+      return "Math Amateur";
     } else {
-      return "Beginner";
+      return "Math Beginner";
     }
   }
   
   // Simulate processing incoming Bluetooth data
   void simulateBluetoothData() {
     // Randomly simulate button presses
-    if (random.nextInt(4) > 0) { // 2/3 chance of input
+    if (random.nextInt(3) > 0) { // 2/3 chance of input
       Direction input = Direction.values[random.nextInt(Direction.values.length)];
       checkHit(input);
     }
@@ -148,17 +179,39 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
       setState(() {
         hitArrow!.isHit = true;
         
+        // Check if the number on the arrow is the correct answer
+        bool isCorrectAnswer = hitArrow.number == correctAnswer;
+        lastAnswerCorrect = isCorrectAnswer;
+        
         // Calculate rating based on timing accuracy
         HitRating rating;
         if (closestDistance < perfectZone) {
           rating = HitRating.perfect;
-          score += 100 * (combo + 1);
-          combo++;
+          // Award or penalize based on correctness
+          if (isCorrectAnswer) {
+            score += 100 * (combo + 1);
+            combo++;
+            // Generate a new equation immediately after correct answer
+            generateMathEquation();
+          } else {
+            score -= 50;
+            combo = 0;
+          }
         } else {
           rating = HitRating.good;
-          score += 50 * (combo + 1);
-          combo++;
+          if (isCorrectAnswer) {
+            score += 50 * (combo + 1);
+            combo++;
+            // Generate a new equation immediately after correct answer
+            generateMathEquation();
+          } else {
+            score -= 25;
+            combo = 0;
+          }
         }
+        
+        // Prevent negative score
+        if (score < 0) score = 0;
         
         // Update max combo
         if (combo > maxCombo) {
@@ -183,7 +236,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   }
   
   // Arrow visuals
-  Widget arrowWidget(Direction direction, {double? position, bool isHit = false, bool isTarget = false, HitRating? hitRating}) {
+  Widget arrowWidget(Direction direction, {double? position, bool isHit = false, bool isTarget = false, HitRating? hitRating, int? number}) {
     IconData icon;
     switch (direction) {
       case Direction.up:
@@ -222,10 +275,10 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     if (isHit) {
       switch (hitRating) {
         case HitRating.perfect:
-          arrowColor = Colors.greenAccent;
+          arrowColor = lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent;
           break;
         case HitRating.good:
-          arrowColor = Colors.yellowAccent;
+          arrowColor = lastAnswerCorrect ? Colors.yellowAccent : Colors.redAccent;
           break;
         case HitRating.bad:
           arrowColor = Colors.redAccent;
@@ -259,10 +312,31 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
             ),
           ],
         ),
-        child: Icon(
-          icon, 
-          size: 40,
-          color: arrowColor,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              icon, 
+              size: 40,
+              color: arrowColor,
+            ),
+            if (number != null)
+              Container(
+                padding: EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  number.toString(),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -272,16 +346,16 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   Widget _buildRatingBadge() {
     Color ratingColor;
     switch (currentRating) {
-      case "Champion":
+      case "Math Champion":
         ratingColor = Colors.deepPurple;
         break;
-      case "Master":
+      case "Math Master":
         ratingColor = Colors.redAccent;
         break;
-      case "Pro":
+      case "Math Pro":
         ratingColor = Colors.blueAccent;
         break;
-      case "Amateur":
+      case "Math Amateur":
         ratingColor = Colors.green;
         break;
       default:
@@ -312,6 +386,87 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     );
   }
 
+  // Math equation widget
+  Widget _buildMathEquation() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: Colors.purpleAccent,
+          width: 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purpleAccent.withOpacity(0.3),
+            blurRadius: 15,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            "SOLVE",
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 15),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "$firstNumber + $secondNumber = ?",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          // Answer hint removed
+        ],
+      ),
+    );
+  }
+
+
+  void updateGame() {
+    setState(() {
+      // Move all arrows upward
+      for (var arrow in arrows) {
+        // Non-hit arrows move at normal speed
+        if (!arrow.isHit) {
+          arrow.position += 0.005; // Move 0.5% up each frame
+        } else {
+          // Hit arrows move faster to clear screen
+          arrow.position += 0.015;
+        }
+      }
+      
+      // Remove arrows that went off-screen
+      arrows.removeWhere((arrow) {
+        // Miss condition - arrow passed target without being hit
+        if (arrow.position > 1.2 && !arrow.isHit) {
+          // Reset combo on miss
+          combo = 0;
+          return true;
+        }
+        // Remove hit arrows that leave the screen
+        if (arrow.position > 1.2) {
+          return true;
+        }
+        return false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Calculate if we should show the hit feedback
@@ -320,200 +475,219 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('DDR Simulator'),
+        title: Text('Math DDR Simulator'),
         backgroundColor: Colors.black87,
         elevation: 10,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // DDR dancing screen
-            Container(
-              width: 400,
-              height: 550,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.pinkAccent, width: 4),
-                borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
-                  colors: [Colors.black, Colors.deepPurple.withOpacity(0.3)],
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                ),
-              ),
-              child: Stack(
+      body: Row(
+        children: [
+          // Left side: DDR game
+          Expanded(
+            flex: 7,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Hit line indicator
-                  Positioned(
-                    top: 90,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 3,
-                      color: Colors.cyan.withOpacity(0.7),
-                    ),
-                  ),
-
-                  // Render all flowing arrows
-                  ...arrows.map((arrow) {
-                    // Calculate vertical position - map from 0.0-1.0 to bottom-top of game area
-                    double top = 550 - (arrow.position * 460);
-                    
-                    // Get fixed position from lanePositions
-                    double left = lanePositions[arrow.direction]! - 32.5;
-                    
-                    return Positioned(
-                      top: top - 32.5, // Center arrow vertically
-                      left: left,      // Use fixed lane position
-                      child: arrowWidget(
-                        arrow.direction, 
-                        isHit: arrow.isHit,
-                        hitRating: arrow.hitRating
+                  // DDR dancing screen
+                  Container(
+                    width: 400,
+                    height: 550,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.pinkAccent, width: 4),
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [Colors.black, Colors.deepPurple.withOpacity(0.3)],
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
                       ),
-                    );
-                  }),
-                  
-                  // Target zones - using the same lane positions for perfect alignment
-                  ...Direction.values.map((direction) => 
-                    Positioned(
-                      top: 90 - 35, // Center the targets on the hit line
-                      left: lanePositions[direction]! - 35,
-                      child: arrowWidget(direction, isTarget: true)
-                    )
-                  ),
-                  
-                  // Hit feedback text
-                  if (showHitFeedback && lastHitRating != null)
-                    Positioned(
-                      top: 130,
-                      left: 0,
-                      right: 0,
-                      child: AnimatedOpacity(
-                        opacity: showHitFeedback ? 1.0 : 0.0,
-                        duration: Duration(milliseconds: 200),
-                        child: Center(
+                    ),
+                    child: Stack(
+                      children: [
+                        // Hit line indicator
+                        Positioned(
+                          top: 90,
+                          left: 0,
+                          right: 0,
                           child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: lastHitRating == HitRating.perfect 
-                                  ? Colors.greenAccent 
-                                  : (lastHitRating == HitRating.good 
-                                      ? Colors.yellowAccent 
-                                      : Colors.redAccent),
-                                width: 2
-                              ),
+                            height: 3,
+                            color: Colors.cyan.withOpacity(0.7),
+                          ),
+                        ),
+
+                        // Render all flowing arrows
+                        ...arrows.map((arrow) {
+                          // Calculate vertical position - map from 0.0-1.0 to bottom-top of game area
+                          double top = 550 - (arrow.position * 460);
+                          
+                          // Get fixed position from lanePositions
+                          double left = lanePositions[arrow.direction]! - 32.5;
+                          
+                          return Positioned(
+                            top: top - 32.5, // Center arrow vertically
+                            left: left,
+                            child: arrowWidget(
+                              arrow.direction, 
+                              isHit: arrow.isHit,
+                              hitRating: arrow.hitRating,
+                              number: arrow.number,
                             ),
-                            child: Text(
-                              lastHitRating == HitRating.perfect 
-                                ? 'PERFECT!' 
-                                :  'GOOD!',
-                              style: TextStyle(
-                                fontSize: 22, 
-                                fontWeight: FontWeight.bold,
-                                color: lastHitRating == HitRating.perfect 
-                                  ? Colors.greenAccent 
-                                  : Colors.yellowAccent 
+                          );
+                        }).toList(),
+                        
+                        // Target zones at top
+                        ...Direction.values.map((direction) => 
+                          Positioned(
+                            top: 90 - 35, // Center on hit line
+                            left: lanePositions[direction]! - 35,
+                            child: arrowWidget(direction, isTarget: true),
+                          )
+                        ).toList(),
+                        
+                        // Hit feedback text
+                        if (showHitFeedback && lastHitRating != null)
+                          Positioned(
+                            top: 150,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Text(
+                                  lastAnswerCorrect 
+                                    ? (lastHitRating == HitRating.perfect ? "PERFECT!" : "GOOD!") 
+                                    : "WRONG ANSWER!",
+                                  style: TextStyle(
+                                    color: lastAnswerCorrect 
+                                      ? (lastHitRating == HitRating.perfect ? Colors.greenAccent : Colors.yellowAccent)
+                                      : Colors.redAccent,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
+                  ),
+                  
+                  // Score display
+                  Container(
+                    width: 400,
+                    margin: EdgeInsets.only(top: 16),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.purpleAccent, width: 2),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Score: $score', 
+                              style: TextStyle(fontSize: 18, color: Colors.white)),
+                            SizedBox(height: 4),
+                            Text('Max Combo: $maxCombo', 
+                              style: TextStyle(fontSize: 14, color: Colors.amber)),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Combo: $combo', 
+                              style: TextStyle(
+                                fontSize: 18, 
+                                color: combo > 0 ? Colors.greenAccent : Colors.white
+                              )),
+                            SizedBox(height: 4),
+                            _buildRatingBadge(),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-            
-            // Score and combo display
-            Container(
-              width: 400,
-              margin: EdgeInsets.only(top: 16),
+          ),
+          
+          // Right side: Math equation
+          Expanded(
+            flex: 3,
+            child: Container(
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.purpleAccent, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.purpleAccent.withOpacity(0.3),
-                    blurRadius: 10,
-                    spreadRadius: 1,
+                color: Colors.black,
+                border: Border(
+                  left: BorderSide(
+                    color: Colors.purple.withOpacity(0.3),
+                    width: 2,
                   ),
-                ],
+                ),
               ),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Score: $score', 
-                        style: TextStyle(
-                          fontSize: 20, 
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold
-                        )
-                      ),
-                      Text(
-                        'Combo: $combo', 
-                        style: TextStyle(
-                          fontSize: 20, 
-                          color: combo > 10 ? Colors.greenAccent : Colors.white,
-                          fontWeight: FontWeight.bold
-                        )
-                      ),
-                    ],
+                  _buildMathEquation(),
+                  SizedBox(height: 30),
+                  Text(
+                    "How to Play",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Max Combo: $maxCombo', 
-                        style: TextStyle(
-                          fontSize: 16, 
-                          color: Colors.amberAccent
-                        )
-                      ),
-                      _buildRatingBadge(),
-                    ],
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white24, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "• Solve the math equation",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "• Hit arrows with the correct answer",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "• Perfect timing = more points",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "• Wrong answers break your combo",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-  }
-
-  void updateGame() {
-    setState(() {
-      // Move all arrows upward - including hit arrows
-      for (var arrow in arrows) {
-        // All arrows keep moving - both hit and non-hit
-        arrow.position += 0.01; // Move 1% up each frame
-      }
-      
-      // Remove arrows that went off-screen
-      arrows.removeWhere((arrow) {
-        // Miss condition
-        if (arrow.position > 1.2 && !arrow.isHit) {
-          combo = 0;
-          // Update rating after breaking combo
-          currentRating = calculateRating();
-          return true;
-        }
-        
-        // Hit arrows still continue upward until they go off-screen
-        if (arrow.position > 1.2) {
-          return true;
-        }
-        
-        return false;
-      });
-    });
   }
 }
