@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(MyApp());
@@ -40,6 +41,9 @@ class DDRSimulator extends StatefulWidget {
 }
 
 class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMixin {
+  // Add a focus node to capture keyboard input
+  final FocusNode _focusNode = FocusNode();
+  
   Random random = Random();
   int score = 0;
   int combo = 0;
@@ -67,7 +71,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     Direction.right: 320.0,
   };
   
-  // Reference for last Bluetooth inputs
+  // Reference for last keyboard inputs
   Direction? lastInput;
   int lastInputTime = 0;
 
@@ -87,20 +91,32 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     });
     
     // Generate new arrows less frequently (for easier gameplay)
-    Timer.periodic(Duration(milliseconds: 3500), (timer) {
+    Timer.periodic(Duration(milliseconds: 2500), (timer) {
       generateArrow();
-    });
-    
-    // Simulate Bluetooth input
-    Timer.periodic(Duration(milliseconds: 500), (timer) {
-      simulateBluetoothData();
     });
   }
 
   @override
   void dispose() {
     gameTimer?.cancel();
+    _focusNode.dispose();
     super.dispose();
+  }
+  
+  // Handle keyboard input
+  void _handleKeyEvent(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
+      // Map keys to directions
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        checkHit(Direction.up);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        checkHit(Direction.down);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        checkHit(Direction.left);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        checkHit(Direction.right);
+      }
+    }
   }
   
   // Generate a new math addition equation
@@ -147,16 +163,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     }
   }
   
-  // Simulate processing incoming Bluetooth data
-  void simulateBluetoothData() {
-    // Randomly simulate button presses
-    if (random.nextInt(3) > 0) { // 2/3 chance of input
-      Direction input = Direction.values[random.nextInt(Direction.values.length)];
-      checkHit(input);
-    }
-  }
-  
-  // Process a player input (from Bluetooth)
+  // Process a player input (from keyboard)
   void checkHit(Direction input) {
     // Find the nearest arrow in the target zone with matching direction
     Arrow? hitArrow;
@@ -194,7 +201,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
             // Generate a new equation immediately after correct answer
             generateMathEquation();
           } else {
-            score -= 50;
+            score -= 20;
             combo = 0;
           }
         } else {
@@ -205,7 +212,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
             // Generate a new equation immediately after correct answer
             generateMathEquation();
           } else {
-            score -= 25;
+            score -= 10;
             combo = 0;
           }
         }
@@ -430,12 +437,10 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
               ),
             ],
           ),
-          // Answer hint removed
         ],
       ),
     );
   }
-
 
   void updateGame() {
     setState(() {
@@ -472,221 +477,255 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     // Calculate if we should show the hit feedback
     bool showHitFeedback = DateTime.now().millisecondsSinceEpoch - lastHitTime < 800;
     
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text('Math DDR Simulator'),
-        backgroundColor: Colors.black87,
-        elevation: 10,
-      ),
-      body: Row(
-        children: [
-          // Left side: DDR game
-          Expanded(
-            flex: 7,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // DDR dancing screen
-                  Container(
-                    width: 400,
-                    height: 550,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.pinkAccent, width: 4),
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [Colors.black, Colors.deepPurple.withOpacity(0.3)],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        // Hit line indicator
-                        Positioned(
-                          top: 90,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            height: 3,
-                            color: Colors.cyan.withOpacity(0.7),
-                          ),
+    // Wrap the entire game in a RawKeyboardListener
+    return RawKeyboardListener(
+      focusNode: _focusNode,
+      onKey: _handleKeyEvent,
+      autofocus: true, // Auto-focus so it captures keyboard input right away
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          title: Text('Math DDR Simulator'),
+          backgroundColor: Colors.black87,
+          elevation: 10,
+        ),
+        body: Row(
+          children: [
+            // Left side: DDR game
+            Expanded(
+              flex: 7,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // DDR dancing screen
+                    Container(
+                      width: 400,
+                      height: 550,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.pinkAccent, width: 4),
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          colors: [Colors.black, Colors.deepPurple.withOpacity(0.3)],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
                         ),
-
-                        // Render all flowing arrows
-                        ...arrows.map((arrow) {
-                          // Calculate vertical position - map from 0.0-1.0 to bottom-top of game area
-                          double top = 550 - (arrow.position * 460);
-                          
-                          // Get fixed position from lanePositions
-                          double left = lanePositions[arrow.direction]! - 32.5;
-                          
-                          return Positioned(
-                            top: top - 32.5, // Center arrow vertically
-                            left: left,
-                            child: arrowWidget(
-                              arrow.direction, 
-                              isHit: arrow.isHit,
-                              hitRating: arrow.hitRating,
-                              number: arrow.number,
+                      ),
+                      child: Stack(
+                        children: [
+                          // Hit line indicator
+                          Positioned(
+                            top: 90,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 3,
+                              color: Colors.cyan.withOpacity(0.7),
                             ),
-                          );
-                        }).toList(),
-                        
-                        // Target zones at top
-                        ...Direction.values.map((direction) => 
+                          ),
+
+                          // Render all flowing arrows
+                          ...arrows.map((arrow) {
+                            // Calculate vertical position - map from 0.0-1.0 to bottom-top of game area
+                            double top = 550 - (arrow.position * 460);
+                            
+                            // Get fixed position from lanePositions
+                            double left = lanePositions[arrow.direction]! - 32.5;
+                            
+                            return Positioned(
+                              top: top - 32.5, // Center arrow vertically
+                              left: left,
+                              child: arrowWidget(
+                                arrow.direction, 
+                                isHit: arrow.isHit,
+                                hitRating: arrow.hitRating,
+                                number: arrow.number,
+                              ),
+                            );
+                          }).toList(),
+                          
+                          // Target zones at top
+                          ...Direction.values.map((direction) => 
+                            Positioned(
+                              top: 90 - 35, // Center on hit line
+                              left: lanePositions[direction]! - 35,
+                              child: arrowWidget(direction, isTarget: true),
+                            )
+                          ).toList(),
+                          
+                          // Hit feedback text
+                          if (showHitFeedback && lastHitRating != null)
+                            Positioned(
+                              top: 150,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    lastAnswerCorrect 
+                                      ? (lastHitRating == HitRating.perfect ? "PERFECT!" : "GOOD!") 
+                                      : "WRONG ANSWER!",
+                                    style: TextStyle(
+                                      color: lastAnswerCorrect 
+                                        ? (lastHitRating == HitRating.perfect ? Colors.greenAccent : Colors.yellowAccent)
+                                        : Colors.redAccent,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          
+                          // Key controls reminder
                           Positioned(
-                            top: 90 - 35, // Center on hit line
-                            left: lanePositions[direction]! - 35,
-                            child: arrowWidget(direction, isTarget: true),
-                          )
-                        ).toList(),
-                        
-                        // Hit feedback text
-                        if (showHitFeedback && lastHitRating != null)
-                          Positioned(
-                            top: 150,
+                            bottom: 10,
                             left: 0,
                             right: 0,
                             child: Center(
                               child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent,
-                                    width: 2,
-                                  ),
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  lastAnswerCorrect 
-                                    ? (lastHitRating == HitRating.perfect ? "PERFECT!" : "GOOD!") 
-                                    : "WRONG ANSWER!",
+                                  "Use arrow keys to hit targets",
                                   style: TextStyle(
-                                    color: lastAnswerCorrect 
-                                      ? (lastHitRating == HitRating.perfect ? Colors.greenAccent : Colors.yellowAccent)
-                                      : Colors.redAccent,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white70,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  
-                  // Score display
-                  Container(
-                    width: 400,
-                    margin: EdgeInsets.only(top: 16),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.purpleAccent, width: 2),
+                    
+                    // Score display
+                    Container(
+                      width: 400,
+                      margin: EdgeInsets.only(top: 16),
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.purpleAccent, width: 2),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Score: $score', 
+                                style: TextStyle(fontSize: 18, color: Colors.white)),
+                              SizedBox(height: 4),
+                              Text('Max Combo: $maxCombo', 
+                                style: TextStyle(fontSize: 14, color: Colors.amber)),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('Combo: $combo', 
+                                style: TextStyle(
+                                  fontSize: 18, 
+                                  color: combo > 0 ? Colors.greenAccent : Colors.white
+                                )),
+                              SizedBox(height: 4),
+                              _buildRatingBadge(),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Score: $score', 
-                              style: TextStyle(fontSize: 18, color: Colors.white)),
-                            SizedBox(height: 4),
-                            Text('Max Combo: $maxCombo', 
-                              style: TextStyle(fontSize: 14, color: Colors.amber)),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('Combo: $combo', 
-                              style: TextStyle(
-                                fontSize: 18, 
-                                color: combo > 0 ? Colors.greenAccent : Colors.white
-                              )),
-                            SizedBox(height: 4),
-                            _buildRatingBadge(),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Right side: Math equation
-          Expanded(
-            flex: 3,
-            child: Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                border: Border(
-                  left: BorderSide(
-                    color: Colors.purple.withOpacity(0.3),
-                    width: 2,
-                  ),
+                  ],
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildMathEquation(),
-                  SizedBox(height: 30),
-                  Text(
-                    "How to Play",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+            ),
+            
+            // Right side: Math equation
+            Expanded(
+              flex: 3,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  border: Border(
+                    left: BorderSide(
+                      color: Colors.purple.withOpacity(0.3),
+                      width: 2,
                     ),
                   ),
-                  SizedBox(height: 16),
-                  Container(
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white24, width: 1),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildMathEquation(),
+                    SizedBox(height: 30),
+                    Text(
+                      "How to Play",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "• Solve the math equation",
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          "• Hit arrows with the correct answer",
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          "• Perfect timing = more points",
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          "• Wrong answers break your combo",
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
-                        ),
-                      ],
+                    SizedBox(height: 16),
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white24, width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "• Solve the math equation",
+                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• Hit arrows with the correct answer",
+                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• Press arrow keys when aligned with target",
+                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• Perfect timing = more points",
+                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            "• Wrong answers break your combo",
+                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
