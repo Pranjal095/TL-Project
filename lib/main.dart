@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
   runApp(MyApp());
 }
 
 enum Direction { up, down, left, right }
+
 enum HitRating { perfect, good, bad, miss }
 
 class Arrow {
@@ -16,7 +18,7 @@ class Arrow {
   double position = 0.0; // 0.0 = bottom, 1.0 = top target
   bool isHit = false;
   HitRating? hitRating;
-  
+
   Arrow(this.direction, this.number);
 }
 
@@ -40,10 +42,19 @@ class DDRSimulator extends StatefulWidget {
   _DDRSimulatorState createState() => _DDRSimulatorState();
 }
 
-class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMixin {
+class _DDRSimulatorState extends State<DDRSimulator>
+    with TickerProviderStateMixin {
   // Add a focus node to capture keyboard input
   final FocusNode _focusNode = FocusNode();
-  
+
+  late VideoPlayerController _videoController;
+  bool _isVideoInitialized = false;
+
+  // Add arrow speed control variables
+  double arrowBaseSpeed = 0.01; // Base speed that can be adjusted
+  double arrowSpeedMultiplier =
+      1.0; // Multiplier that increases with perfect hits
+
   Random random = Random();
   int score = 0;
   int combo = 0;
@@ -51,18 +62,19 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   String currentRating = "Beginner";
   Timer? gameTimer;
   List<Arrow> arrows = [];
-  
+
   // Math equation variables
   int firstNumber = 0;
   int secondNumber = 0;
   int correctAnswer = 0;
   bool lastAnswerCorrect = true;
-  
+  int arrowsSinceLastCorrect = 0;
+
   // Target zone ranges (percentage of lane height)
   final double perfectZone = 0.05; // ±5% of center
-  final double goodZone = 0.10;    // ±10% of center
-  final double badZone = 0.15;     // ±15% of center
-  
+  final double goodZone = 0.10; // ±10% of center
+  final double badZone = 0.15; // ±15% of center
+
   // Define fixed lane positions for precise alignment
   final Map<Direction, double> lanePositions = {
     Direction.left: 80.0,
@@ -70,28 +82,45 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     Direction.up: 240.0,
     Direction.right: 320.0,
   };
-  
+
   // Reference for last keyboard inputs
   Direction? lastInput;
   int lastInputTime = 0;
 
   HitRating? lastHitRating;
   int lastHitTime = 0;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
+    // Initialize video player with better error handling for Linux
+    _videoController = VideoPlayerController.asset('assets/dance.mp4');
+
+    _videoController.initialize().then((_) {
+      setState(() {
+        _isVideoInitialized = true;
+        _videoController.setLooping(true);
+        _videoController.play();
+        _videoController.setVolume(0.0); // 🔇 Mute the video
+      });
+    }).catchError((error) {
+      print('Video player error: $error');
+      setState(() {
+        _isVideoInitialized = false;
+      });
+    });
+
     // Generate initial math equation
     generateMathEquation();
-    
+
     // Start game loop - updates 30 times per second
     gameTimer = Timer.periodic(Duration(milliseconds: 33), (timer) {
       updateGame();
     });
-    
-    // Generate new arrows less frequently (for easier gameplay)
-    Timer.periodic(Duration(milliseconds: 2500), (timer) {
+
+    // Generate new arrows
+    Timer.periodic(Duration(milliseconds: 1500), (timer) {
       generateArrow();
     });
   }
@@ -100,25 +129,26 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
   void dispose() {
     gameTimer?.cancel();
     _focusNode.dispose();
+    _videoController.dispose();
     super.dispose();
   }
-  
+
   // Handle keyboard input
   void _handleKeyEvent(RawKeyEvent event) {
     if (event is RawKeyDownEvent) {
-      // Map keys to directions
-      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      // Map WASD keys to DDR directions
+      if (event.logicalKey == LogicalKeyboardKey.keyW) {
         checkHit(Direction.up);
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      } else if (event.logicalKey == LogicalKeyboardKey.keyS) {
         checkHit(Direction.down);
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      } else if (event.logicalKey == LogicalKeyboardKey.keyA) {
         checkHit(Direction.left);
-      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      } else if (event.logicalKey == LogicalKeyboardKey.keyD) {
         checkHit(Direction.right);
       }
     }
   }
-  
+
   // Generate a new math addition equation
   void generateMathEquation() {
     setState(() {
@@ -127,27 +157,41 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
       correctAnswer = firstNumber + secondNumber;
     });
   }
-  
+
   void generateArrow() {
     setState(() {
       // Random direction
       Direction dir = Direction.values[random.nextInt(Direction.values.length)];
-      
+
       // Generate a number for the arrow
       int number;
-      if (random.nextDouble() < 0.3) { // 30% chance of correct answer
+
+      // Force correct answer if we haven't had one in the last 3 arrows
+      if (arrowsSinceLastCorrect >= 3) {
         number = correctAnswer;
+        arrowsSinceLastCorrect = 0; // Reset counter
       } else {
-        // Generate a random number that is not the correct answer
-        do {
-          number = random.nextInt(18) + 1; // Possible sums of single digits go up to 18 (9+9)
-        } while (number == correctAnswer);
+        // Otherwise use probability-based approach
+        if (random.nextDouble() < 0.3) {
+          // 30% chance of correct answer
+          number = correctAnswer;
+          arrowsSinceLastCorrect = 0; // Reset counter
+        } else {
+          // Generate a random number that is not the correct answer
+          do {
+            number = random.nextInt(18) +
+                1; // Possible sums of single digits go up to 18 (9+9)
+          } while (number == correctAnswer);
+
+          // Increment counter since we generated an incorrect answer
+          arrowsSinceLastCorrect++;
+        }
       }
-      
+
       arrows.add(Arrow(dir, number));
     });
   }
-  
+
   // Calculate player rating based on score and combo
   String calculateRating() {
     if (score >= 10000 && maxCombo >= 50) {
@@ -162,18 +206,18 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
       return "Math Beginner";
     }
   }
-  
+
   // Process a player input (from keyboard)
   void checkHit(Direction input) {
     // Find the nearest arrow in the target zone with matching direction
     Arrow? hitArrow;
     double closestDistance = double.infinity;
-    
+
     for (var arrow in arrows) {
       if (arrow.direction == input && !arrow.isHit) {
         // Calculate distance from target (1.0 is perfect)
         double distance = (arrow.position - 1.0).abs();
-        
+
         // Only consider arrows near the target
         if (distance < badZone && distance < closestDistance) {
           closestDistance = distance;
@@ -181,15 +225,15 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
         }
       }
     }
-    
+
     if (hitArrow != null) {
       setState(() {
         hitArrow!.isHit = true;
-        
+
         // Check if the number on the arrow is the correct answer
         bool isCorrectAnswer = hitArrow.number == correctAnswer;
         lastAnswerCorrect = isCorrectAnswer;
-        
+
         // Calculate rating based on timing accuracy
         HitRating rating;
         if (closestDistance < perfectZone) {
@@ -197,8 +241,10 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
           // Award or penalize based on correctness
           if (isCorrectAnswer) {
             score += 100 * (combo + 1);
-            combo++;
+            combo++; // Increase speed by 5% for perfect hits with correct answers
+            arrowSpeedMultiplier *= 1.05;
             // Generate a new equation immediately after correct answer
+
             generateMathEquation();
           } else {
             score -= 20;
@@ -216,34 +262,39 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
             combo = 0;
           }
         }
-        
+
         // Prevent negative score
         if (score < 0) score = 0;
-        
+
         // Update max combo
         if (combo > maxCombo) {
           maxCombo = combo;
         }
-        
+
         // Update player rating
         currentRating = calculateRating();
-        
+
         // Store the hit rating with the arrow
-        hitArrow!.hitRating = rating;
-        
+        hitArrow.hitRating = rating;
+
         // Store the hit rating to display feedback
         lastHitRating = rating;
         lastHitTime = DateTime.now().millisecondsSinceEpoch;
-        
+
         // Store last input for visual feedback
         lastInput = input;
         lastInputTime = DateTime.now().millisecondsSinceEpoch;
       });
     }
   }
-  
+
   // Arrow visuals
-  Widget arrowWidget(Direction direction, {double? position, bool isHit = false, bool isTarget = false, HitRating? hitRating, int? number}) {
+  Widget arrowWidget(Direction direction,
+      {double? position,
+      bool isHit = false,
+      bool isTarget = false,
+      HitRating? hitRating,
+      int? number}) {
     IconData icon;
     switch (direction) {
       case Direction.up:
@@ -259,7 +310,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
         icon = Icons.arrow_forward;
         break;
     }
-    
+
     // Target zones are stationary at the top
     if (isTarget) {
       return Container(
@@ -268,24 +319,23 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
         decoration: BoxDecoration(
           color: Colors.black45,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: Colors.cyan.withOpacity(0.8), 
-            width: 2
-          ),
+          border: Border.all(color: Colors.cyan.withOpacity(0.8), width: 2),
         ),
         child: Icon(icon, color: Colors.cyan.withOpacity(0.8), size: 40),
       );
     }
-    
+
     // Get color based on hit rating
     Color arrowColor;
     if (isHit) {
       switch (hitRating) {
         case HitRating.perfect:
-          arrowColor = lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent;
+          arrowColor =
+              lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent;
           break;
         case HitRating.good:
-          arrowColor = lastAnswerCorrect ? Colors.yellowAccent : Colors.redAccent;
+          arrowColor =
+              lastAnswerCorrect ? Colors.yellowAccent : Colors.redAccent;
           break;
         case HitRating.bad:
           arrowColor = Colors.redAccent;
@@ -296,7 +346,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     } else {
       arrowColor = Colors.pinkAccent; // Default non-hit color
     }
-    
+
     // Active arrows that flow upward
     return AnimatedOpacity(
       opacity: isHit ? 0.7 : 1.0,
@@ -322,14 +372,14 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(
-              icon, 
-              size: 40,
-              color: arrowColor,
-            ),
+            // Icon(
+            //   icon,
+            //   size: 40,
+            //   color: arrowColor,
+            // ),
             if (number != null)
               Container(
-                padding: EdgeInsets.all(2),
+                padding: EdgeInsets.all(1),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.7),
                   shape: BoxShape.circle,
@@ -339,7 +389,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    fontSize: 24,
                   ),
                 ),
               ),
@@ -368,7 +418,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
       default:
         ratingColor = Colors.grey;
     }
-    
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -444,17 +494,19 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
 
   void updateGame() {
     setState(() {
+      final currentSpeed = arrowBaseSpeed * arrowSpeedMultiplier;
+
       // Move all arrows upward
       for (var arrow in arrows) {
         // Non-hit arrows move at normal speed
         if (!arrow.isHit) {
-          arrow.position += 0.005; // Move 0.5% up each frame
+          arrow.position += currentSpeed;
         } else {
           // Hit arrows move faster to clear screen
-          arrow.position += 0.015;
+          arrow.position += currentSpeed * 3;
         }
       }
-      
+
       // Remove arrows that went off-screen
       arrows.removeWhere((arrow) {
         // Miss condition - arrow passed target without being hit
@@ -472,16 +524,57 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
     });
   }
 
+// Video player widget with improved Linux support
+  Widget _buildVideoPlayer(
+      VideoPlayerController controller, bool isInitialized) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: 300, // Limit height to prevent overflow
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.pinkAccent, width: 4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: (isInitialized && controller.value.isInitialized)
+            ? AspectRatio(
+                aspectRatio: controller.value.aspectRatio,
+                child: VideoPlayer(controller),
+              )
+            : Container(
+                color: Colors.black,
+                height: 200, // Fixed height for loading container
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.purpleAccent),
+                      SizedBox(height: 16),
+                      Text(
+                        "Loading video...\nLinux users need codec support",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Calculate if we should show the hit feedback
-    bool showHitFeedback = DateTime.now().millisecondsSinceEpoch - lastHitTime < 800;
-    
+    bool showHitFeedback =
+        DateTime.now().millisecondsSinceEpoch - lastHitTime < 800;
+
     // Wrap the entire game in a RawKeyboardListener
     return RawKeyboardListener(
       focusNode: _focusNode,
       onKey: _handleKeyEvent,
-      autofocus: true, // Auto-focus so it captures keyboard input right away
+      autofocus: true,
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -491,26 +584,74 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
         ),
         body: Row(
           children: [
-            // Left side: DDR game
+            // Left panel: DDR game
             Expanded(
-              flex: 7,
+              flex: 5,
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    // Arrow speed control slider
+                    Container(
+                      width: 400,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: Colors.purpleAccent.withOpacity(0.5),
+                            width: 1),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("Arrow Speed",
+                                  style: TextStyle(color: Colors.white)),
+                              Text(
+                                  "Multiplier: ${arrowSpeedMultiplier.toStringAsFixed(2)}x",
+                                  style: TextStyle(color: Colors.amberAccent)),
+                            ],
+                          ),
+                          Slider(
+                            value: arrowBaseSpeed,
+                            min: 0.005,
+                            max: 0.02,
+                            divisions: 15,
+                            activeColor: Colors.purpleAccent,
+                            inactiveColor: Colors.purpleAccent.withOpacity(0.3),
+                            onChanged: (value) {
+                              setState(() {
+                                arrowBaseSpeed = value;
+                              });
+                            },
+                            label:
+                                "${(arrowBaseSpeed * 100).toStringAsFixed(1)}%",
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 10),
+
                     // DDR dancing screen
                     Container(
                       width: 400,
-                      height: 550,
+                      height: 500, // Reduced height to accommodate the slider
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.pinkAccent, width: 4),
                         borderRadius: BorderRadius.circular(12),
                         gradient: LinearGradient(
-                          colors: [Colors.black, Colors.deepPurple.withOpacity(0.3)],
+                          colors: [
+                            Colors.black,
+                            Colors.deepPurple.withOpacity(0.3)
+                          ],
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
                         ),
                       ),
+
                       child: Stack(
                         children: [
                           // Hit line indicator
@@ -528,31 +669,33 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                           ...arrows.map((arrow) {
                             // Calculate vertical position - map from 0.0-1.0 to bottom-top of game area
                             double top = 550 - (arrow.position * 460);
-                            
+
                             // Get fixed position from lanePositions
-                            double left = lanePositions[arrow.direction]! - 32.5;
-                            
+                            double left =
+                                lanePositions[arrow.direction]! - 32.5;
+
                             return Positioned(
                               top: top - 32.5, // Center arrow vertically
                               left: left,
                               child: arrowWidget(
-                                arrow.direction, 
+                                arrow.direction,
                                 isHit: arrow.isHit,
                                 hitRating: arrow.hitRating,
                                 number: arrow.number,
                               ),
                             );
                           }).toList(),
-                          
+
                           // Target zones at top
-                          ...Direction.values.map((direction) => 
-                            Positioned(
-                              top: 90 - 35, // Center on hit line
-                              left: lanePositions[direction]! - 35,
-                              child: arrowWidget(direction, isTarget: true),
-                            )
-                          ).toList(),
-                          
+                          ...Direction.values
+                              .map((direction) => Positioned(
+                                    top: 90 - 35, // Center on hit line
+                                    left: lanePositions[direction]! - 35,
+                                    child:
+                                        arrowWidget(direction, isTarget: true),
+                                  ))
+                              .toList(),
+
                           // Hit feedback text
                           if (showHitFeedback && lastHitRating != null)
                             Positioned(
@@ -561,23 +704,30 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                               right: 0,
                               child: Center(
                                 child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.7),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: lastAnswerCorrect ? Colors.greenAccent : Colors.redAccent,
+                                      color: lastAnswerCorrect
+                                          ? Colors.greenAccent
+                                          : Colors.redAccent,
                                       width: 2,
                                     ),
                                   ),
                                   child: Text(
-                                    lastAnswerCorrect 
-                                      ? (lastHitRating == HitRating.perfect ? "PERFECT!" : "GOOD!") 
-                                      : "WRONG ANSWER!",
+                                    lastAnswerCorrect
+                                        ? (lastHitRating == HitRating.perfect
+                                            ? "PERFECT!"
+                                            : "GOOD!")
+                                        : "WRONG ANSWER!",
                                     style: TextStyle(
-                                      color: lastAnswerCorrect 
-                                        ? (lastHitRating == HitRating.perfect ? Colors.greenAccent : Colors.yellowAccent)
-                                        : Colors.redAccent,
+                                      color: lastAnswerCorrect
+                                          ? (lastHitRating == HitRating.perfect
+                                              ? Colors.greenAccent
+                                              : Colors.yellowAccent)
+                                          : Colors.redAccent,
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -585,7 +735,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                                 ),
                               ),
                             ),
-                          
+
                           // Key controls reminder
                           Positioned(
                             bottom: 10,
@@ -593,7 +743,8 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                             right: 0,
                             child: Center(
                               child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.black54,
                                   borderRadius: BorderRadius.circular(10),
@@ -611,7 +762,7 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                         ],
                       ),
                     ),
-                    
+
                     // Score display
                     Container(
                       width: 400,
@@ -620,7 +771,8 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                       decoration: BoxDecoration(
                         color: Colors.black87,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.purpleAccent, width: 2),
+                        border:
+                            Border.all(color: Colors.purpleAccent, width: 2),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -628,21 +780,24 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Score: $score', 
-                                style: TextStyle(fontSize: 18, color: Colors.white)),
+                              Text('Score: $score',
+                                  style: TextStyle(
+                                      fontSize: 18, color: Colors.white)),
                               SizedBox(height: 4),
-                              Text('Max Combo: $maxCombo', 
-                                style: TextStyle(fontSize: 14, color: Colors.amber)),
+                              Text('Max Combo: $maxCombo',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.amber)),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text('Combo: $combo', 
-                                style: TextStyle(
-                                  fontSize: 18, 
-                                  color: combo > 0 ? Colors.greenAccent : Colors.white
-                                )),
+                              Text('Combo: $combo',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      color: combo > 0
+                                          ? Colors.greenAccent
+                                          : Colors.white)),
                               SizedBox(height: 4),
                               _buildRatingBadge(),
                             ],
@@ -654,8 +809,8 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                 ),
               ),
             ),
-            
-            // Right side: Math equation
+
+            // Middle panel: Math equation
             Expanded(
               flex: 3,
               child: Container(
@@ -664,9 +819,9 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                   color: Colors.black,
                   border: Border(
                     left: BorderSide(
-                      color: Colors.purple.withOpacity(0.3),
-                      width: 2,
-                    ),
+                        color: Colors.purple.withOpacity(0.3), width: 2),
+                    right: BorderSide(
+                        color: Colors.purple.withOpacity(0.3), width: 2),
                   ),
                 ),
                 child: Column(
@@ -695,32 +850,91 @@ class _DDRSimulatorState extends State<DDRSimulator> with TickerProviderStateMix
                         children: [
                           Text(
                             "• Solve the math equation",
-                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16),
                           ),
                           SizedBox(height: 8),
                           Text(
                             "• Hit arrows with the correct answer",
-                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16),
                           ),
                           SizedBox(height: 8),
                           Text(
                             "• Press arrow keys when aligned with target",
-                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16),
                           ),
                           SizedBox(height: 8),
                           Text(
                             "• Perfect timing = more points",
-                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16),
                           ),
                           SizedBox(height: 8),
                           Text(
                             "• Wrong answers break your combo",
-                            style: TextStyle(color: Colors.white70, fontSize: 16),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 16),
                           ),
                         ],
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+
+            // Right panel: Video player
+            Expanded(
+              flex: 4,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                child: SingleChildScrollView(
+                  // Add this to make it scrollable
+                  child: Column(
+                    children: [
+                      Text(
+                        "DDR Dance Reference",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      _buildVideoPlayer(_videoController, _isVideoInitialized),
+                      SizedBox(height: 20),
+                      // Video codec troubleshooting info
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: Colors.pinkAccent.withOpacity(0.5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Video not playing?",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                            SizedBox(height: 8),
+                            Text("Linux users need to install codecs:",
+                                style: TextStyle(color: Colors.white70)),
+                            SizedBox(height: 4),
+                            Text(
+                                "sudo apt-get install ubuntu-restricted-extras",
+                                style: TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontFamily: "monospace")),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
