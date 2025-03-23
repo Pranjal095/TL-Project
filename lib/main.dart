@@ -94,35 +94,37 @@ class _DDRSimulatorState extends State<DDRSimulator>
   void initState() {
     super.initState();
 
-    // Initialize video player with better error handling for Linux
-    _videoController = VideoPlayerController.asset('assets/dance.mp4');
+    // Initialize video player with better web support
+    try {
+      _videoController = VideoPlayerController.asset('assets/dance.mp4');
+      _videoController.initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _isVideoInitialized = true;
+            _videoController.setLooping(true);
+            _videoController.play();
+          });
+        }
+      }).catchError((error) {
+        print('Video player error: $error');
+        if (mounted) {
+          setState(() {
+            _isVideoInitialized = false;
+          });
+        }
+      });
+    } catch (e) {
+      print('Failed to initialize video: $e');
+      _isVideoInitialized = false;
+    }
 
-    _videoController.initialize().then((_) {
-      if (mounted) {
-        setState(() {
-          _isVideoInitialized = true;
-          _videoController.setLooping(true);
-          _videoController.play();
-        });
-      }
-    }).catchError((error) {
-      print('Video player error: $error');
-      if (mounted) {
-        setState(() {
-          _isVideoInitialized = false;
-        });
-      }
-    });
-
-    // Generate initial math equation
+    // Other initialization code remains the same
     generateMathEquation();
-
-    // Start game loop - updates 30 times per second
+    
     gameTimer = Timer.periodic(Duration(milliseconds: 33), (timer) {
       updateGame();
     });
-
-    // Generate new arrows
+    
     Timer.periodic(Duration(milliseconds: 1500), (timer) {
       generateArrow();
     });
@@ -526,7 +528,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
     });
   }
 
-  // Video player widget with improved Linux support
+  // Video player widget with improved web support
   Widget _buildVideoPlayer(VideoPlayerController controller, bool isInitialized) {
     return Container(
       decoration: BoxDecoration(
@@ -535,17 +537,42 @@ class _DDRSimulatorState extends State<DDRSimulator>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: (isInitialized && controller.value.isInitialized)
-            ? AspectRatio(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (isInitialized && controller.value.isInitialized)
+              AspectRatio(
                 aspectRatio: controller.value.aspectRatio,
                 child: VideoPlayer(controller),
               )
-            : Container(
+            else
+              Container(
                 color: Colors.black,
                 child: Center(
-                  child: CircularProgressIndicator(color: Colors.purpleAccent),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.purpleAccent),
+                      SizedBox(height: 20),
+                      // Fallback content for web when video doesn't load
+                      Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.music_note, // Changed from dance_floor to music_note
+                          size: 100,
+                          color: Colors.purpleAccent,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+          ],
+        ),
       ),
     );
   }
@@ -736,7 +763,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  "Use arrow keys to hit targets",
+                                  "Use WASD to hit targets",
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 14,
