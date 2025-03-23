@@ -512,10 +512,9 @@ class _DDRSimulatorState extends State<DDRSimulator>
 
       // Remove arrows that went off-screen
       arrows.removeWhere((arrow) {
-        // Miss condition - arrow passed target without being hit
+        // Remove arrows that passed without being hit
         if (arrow.position > 1.2 && !arrow.isHit) {
-          // Reset combo on miss
-          combo = 0;
+          // Don't reset combo on miss anymore
           return true;
         }
         // Remove hit arrows that leave the screen
