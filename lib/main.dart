@@ -98,17 +98,20 @@ class _DDRSimulatorState extends State<DDRSimulator>
     _videoController = VideoPlayerController.asset('assets/dance.mp4');
 
     _videoController.initialize().then((_) {
-      setState(() {
-        _isVideoInitialized = true;
-        _videoController.setLooping(true);
-        _videoController.play();
-        _videoController.setVolume(0.0); // 🔇 Mute the video
-      });
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = true;
+          _videoController.setLooping(true);
+          _videoController.play();
+        });
+      }
     }).catchError((error) {
       print('Video player error: $error');
-      setState(() {
-        _isVideoInitialized = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = false;
+        });
+      }
     });
 
     // Generate initial math equation
@@ -524,13 +527,9 @@ class _DDRSimulatorState extends State<DDRSimulator>
     });
   }
 
-// Video player widget with improved Linux support
-  Widget _buildVideoPlayer(
-      VideoPlayerController controller, bool isInitialized) {
+  // Video player widget with improved Linux support
+  Widget _buildVideoPlayer(VideoPlayerController controller, bool isInitialized) {
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: 300, // Limit height to prevent overflow
-      ),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.pinkAccent, width: 4),
         borderRadius: BorderRadius.circular(12),
@@ -544,20 +543,8 @@ class _DDRSimulatorState extends State<DDRSimulator>
               )
             : Container(
                 color: Colors.black,
-                height: 200, // Fixed height for loading container
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Colors.purpleAccent),
-                      SizedBox(height: 16),
-                      Text(
-                        "Loading video...\nLinux users need codec support",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
+                  child: CircularProgressIndicator(color: Colors.purpleAccent),
                 ),
               ),
       ),
@@ -890,51 +877,8 @@ class _DDRSimulatorState extends State<DDRSimulator>
               flex: 4,
               child: Container(
                 padding: EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  // Add this to make it scrollable
-                  child: Column(
-                    children: [
-                      Text(
-                        "DDR Dance Reference",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      _buildVideoPlayer(_videoController, _isVideoInitialized),
-                      SizedBox(height: 20),
-                      // Video codec troubleshooting info
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.black45,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: Colors.pinkAccent.withOpacity(0.5)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("Video not playing?",
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white)),
-                            SizedBox(height: 8),
-                            Text("Linux users need to install codecs:",
-                                style: TextStyle(color: Colors.white70)),
-                            SizedBox(height: 4),
-                            Text(
-                                "sudo apt-get install ubuntu-restricted-extras",
-                                style: TextStyle(
-                                    color: Colors.greenAccent,
-                                    fontFamily: "monospace")),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                child: Center(
+                  child: _buildVideoPlayer(_videoController, _isVideoInitialized),
                 ),
               ),
             ),
