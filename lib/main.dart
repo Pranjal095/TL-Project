@@ -49,6 +49,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
 
   late VideoPlayerController _videoController;
   bool _isVideoInitialized = false;
+  bool _isVideoPlaying = false;
 
   // Add arrow speed control variables
   double arrowBaseSpeed = 0.01; // Base speed that can be adjusted
@@ -95,29 +96,8 @@ class _DDRSimulatorState extends State<DDRSimulator>
     super.initState();
 
     // Initialize video player with better web support
-    try {
-      _videoController = VideoPlayerController.asset('assets/dance.mp4');
-      _videoController.initialize().then((_) {
-        if (mounted) {
-          setState(() {
-            _isVideoInitialized = true;
-            _videoController.setLooping(true);
-            _videoController.play();
-          });
-        }
-      }).catchError((error) {
-        print('Video player error: $error');
-        if (mounted) {
-          setState(() {
-            _isVideoInitialized = false;
-          });
-        }
-      });
-    } catch (e) {
-      print('Failed to initialize video: $e');
-      _isVideoInitialized = false;
-    }
-
+    _initializeVideo();
+    
     // Other initialization code remains the same
     generateMathEquation();
     
@@ -128,6 +108,39 @@ class _DDRSimulatorState extends State<DDRSimulator>
     Timer.periodic(Duration(milliseconds: 1500), (timer) {
       generateArrow();
     });
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      _videoController = VideoPlayerController.asset('assets/dance.mp4');
+      
+      // Add listener for video player state changes
+      _videoController.addListener(() {
+        if (_videoController.value.isInitialized) {
+          setState(() {
+            _isVideoInitialized = true;
+            _isVideoPlaying = _videoController.value.isPlaying;
+          });
+        }
+      });
+
+      await _videoController.initialize();
+      
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = true;
+          _videoController.setLooping(true);
+          _videoController.play();
+        });
+      }
+    } catch (e) {
+      print('Failed to initialize video: $e');
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = false;
+        });
+      }
+    }
   }
 
   @override
@@ -543,7 +556,16 @@ class _DDRSimulatorState extends State<DDRSimulator>
             if (isInitialized && controller.value.isInitialized)
               AspectRatio(
                 aspectRatio: controller.value.aspectRatio,
-                child: VideoPlayer(controller),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    VideoPlayer(controller),
+                    // Add a semi-transparent overlay to make the video less distracting
+                    Container(
+                      color: Colors.black.withOpacity(0.3),
+                    ),
+                  ],
+                ),
               )
             else
               Container(
@@ -552,9 +574,11 @@ class _DDRSimulatorState extends State<DDRSimulator>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(color: Colors.purpleAccent),
+                      CircularProgressIndicator(
+                        color: Colors.purpleAccent,
+                        strokeWidth: 3,
+                      ),
                       SizedBox(height: 20),
-                      // Fallback content for web when video doesn't load
                       Container(
                         padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -562,10 +586,70 @@ class _DDRSimulatorState extends State<DDRSimulator>
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
-                          Icons.music_note, // Changed from dance_floor to music_note
+                          Icons.music_note,
                           size: 100,
                           color: Colors.purpleAccent,
                         ),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Loading video...',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // Add video controls overlay
+            if (isInitialized && controller.value.isInitialized)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.7),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          _isVideoPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            if (_isVideoPlaying) {
+                              _videoController.pause();
+                            } else {
+                              _videoController.play();
+                            }
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.refresh,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _videoController.seekTo(Duration.zero);
+                            _videoController.play();
+                          });
+                        },
                       ),
                     ],
                   ),
