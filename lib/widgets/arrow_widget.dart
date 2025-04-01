@@ -9,6 +9,7 @@ Widget buildArrowWidget(Direction direction, {
   int? number,
   bool lastAnswerCorrect = true,
 }) {
+  // Get icon for direction
   IconData icon;
   switch (direction) {
     case Direction.up:
@@ -25,7 +26,7 @@ Widget buildArrowWidget(Direction direction, {
       break;
   }
 
-  // Target zones are stationary at the top
+  // Target zones have 3D effect and glow
   if (isTarget) {
     return Container(
       width: 70,
@@ -34,8 +35,32 @@ Widget buildArrowWidget(Direction direction, {
         color: Colors.black45,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.cyan.withOpacity(0.8), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.cyan.withOpacity(0.3),
+            blurRadius: 10,
+            spreadRadius: 2,
+          ),
+        ],
       ),
-      child: Icon(icon, color: Colors.cyan.withOpacity(0.8), size: 40),
+      child: Transform(
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.001)
+          ..rotateX(0.1)
+          ..rotateY(-0.1),
+        alignment: Alignment.center,
+        child: Icon(
+          icon, 
+          color: Colors.cyan.withOpacity(0.8), 
+          size: 40,
+          shadows: [
+            Shadow(
+              color: Colors.cyanAccent.withOpacity(0.5),
+              blurRadius: 15,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -53,13 +78,15 @@ Widget buildArrowWidget(Direction direction, {
         arrowColor = Colors.redAccent;
         break;
       default:
-        arrowColor = Colors.green; // Default hit color
+        arrowColor = Colors.green;
     }
   } else {
-    arrowColor = Colors.pinkAccent; // Default non-hit color
+    // Classic mode uses blue color, Math mode uses pink
+    arrowColor = (number == null || number <= 0) ? 
+                 Colors.blueAccent : Colors.pinkAccent;
   }
 
-  // Active arrows that flow upward
+  // Active arrows with 3D effect and neon glow
   return AnimatedOpacity(
     opacity: isHit ? 0.7 : 1.0,
     duration: Duration(milliseconds: 200),
@@ -75,7 +102,7 @@ Widget buildArrowWidget(Direction direction, {
         ),
         boxShadow: [
           BoxShadow(
-            color: arrowColor.withOpacity(0.7),
+            color: arrowColor.withOpacity(isHit ? 0.3 : 0.7),
             blurRadius: 12,
             spreadRadius: 3,
           ),
@@ -84,12 +111,20 @@ Widget buildArrowWidget(Direction direction, {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (number != null)
+          // Only show number if it's greater than 0 (for math mode)
+          if (number != null && number > 0)
             Container(
-              padding: EdgeInsets.all(1),
+              padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.7),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: arrowColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
               child: Text(
                 number.toString(),
@@ -97,7 +132,38 @@ Widget buildArrowWidget(Direction direction, {
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 24,
+                  shadows: [
+                    Shadow(
+                      color: arrowColor.withOpacity(0.8),
+                      blurRadius: 5,
+                    ),
+                  ],
                 ),
+              ),
+            ),
+          
+          // Arrow icon - make larger for classic mode when no number is shown
+          Icon(
+            icon, 
+            color: arrowColor.withOpacity(0.9),
+            size: (number == null || number <= 0) ? 40 : 14,
+            shadows: [
+              Shadow(
+                color: arrowColor.withOpacity(0.8),
+                blurRadius: 5,
+              ),
+            ],
+          ),
+          
+          // Only show small indicator if we're showing a number
+          if (number != null && number > 0)
+            Positioned(
+              bottom: 5,
+              right: 5,
+              child: Icon(
+                icon,
+                color: arrowColor.withOpacity(0.7),
+                size: 14,
               ),
             ),
         ],

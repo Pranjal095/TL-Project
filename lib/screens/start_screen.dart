@@ -18,7 +18,8 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
 
   double discoBallAngle = 0.0;
 
-  // Add selected difficulty state
+  // Add selected game mode and difficulty state
+  GameMode selectedGameMode = GameMode.math; // Default to math mode
   DifficultyLevel selectedDifficulty = DifficultyLevel.easy;
 
   @override
@@ -78,7 +79,6 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: Colors.black,
       body: SizedBox(
-        // Set explicit size for the container to prevent infinite size
         height: size.height,
         width: size.width,
         child: Stack(
@@ -318,7 +318,7 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                     
                     SizedBox(height: 80),
                     
-                    // Difficulty selection container
+                    // Game mode selection container
                     Container(
                       width: 400,
                       padding: EdgeInsets.all(20),
@@ -340,7 +340,7 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                       child: Column(
                         children: [
                           Text(
-                            "Select Difficulty",
+                            "Select Game Mode",
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -351,18 +351,42 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              _buildDifficultyButton(DifficultyLevel.easy, "Easy", Colors.green),
-                              _buildDifficultyButton(DifficultyLevel.medium, "Medium", Colors.amber),
-                              _buildDifficultyButton(DifficultyLevel.hard, "Hard", Colors.redAccent),
+                              _buildGameModeButton(GameMode.classic, "Classic", Colors.blueAccent),
+                              _buildGameModeButton(GameMode.math, "Math", Colors.purpleAccent),
                             ],
                           ),
+                          
+                          // Only show difficulty selection in math mode
+                          if (selectedGameMode == GameMode.math) 
+                            Column(
+                              children: [
+                                SizedBox(height: 25),
+                                Text(
+                                  "Select Difficulty",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 15),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildDifficultyButton(DifficultyLevel.easy, "Easy", Colors.green),
+                                    _buildDifficultyButton(DifficultyLevel.medium, "Medium", Colors.amber),
+                                    _buildDifficultyButton(DifficultyLevel.hard, "Hard", Colors.redAccent),
+                                  ],
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
                     
                     SizedBox(height: 40),
                     
-                    // Start game button
+                    // Start game button - updated to pass game mode
                     AnimatedBuilder(
                       animation: _controller,
                       builder: (context, child) {
@@ -390,6 +414,7 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(builder: (context) => DDRSimulator(
                               initialDifficulty: selectedDifficulty,
+                              gameMode: selectedGameMode,
                             )),
                           );
                         },
@@ -401,8 +426,8 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                Colors.purpleAccent,
-                                Colors.pinkAccent,
+                                selectedGameMode == GameMode.math ? Colors.purpleAccent : Colors.blueAccent,
+                                selectedGameMode == GameMode.math ? Colors.pinkAccent : Colors.cyanAccent,
                               ],
                             ),
                             borderRadius: BorderRadius.circular(35),
@@ -495,6 +520,55 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                     SizedBox(height: 40), // Bottom padding
                   ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGameModeButton(GameMode mode, String label, Color color) {
+    bool isSelected = selectedGameMode == mode;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedGameMode = mode;
+        });
+      },
+      child: Container(
+        width: 160,
+        padding: EdgeInsets.symmetric(vertical: 18, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.3) : Colors.black45,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.3),
+            width: isSelected ? 3 : 1,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: color.withOpacity(0.5),
+              blurRadius: 10,
+              spreadRadius: 1,
+            )
+          ] : [],
+        ),
+        child: Column(
+          children: [
+            Icon(
+              mode == GameMode.math ? Icons.calculate : Icons.music_note,
+              color: isSelected ? color : Colors.white70,
+              size: 32,
+            ),
+            SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? color : Colors.white70,
               ),
             ),
           ],

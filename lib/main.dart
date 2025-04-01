@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/start_screen.dart';
-import 'models/enums.dart';
+// import 'models/enums.dart';
 
 void main() {
   runApp(MyApp());
