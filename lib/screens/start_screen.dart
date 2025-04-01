@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'ddr_simulator_screen.dart';
+import '../models/enums.dart';
 
 class StartScreen extends StatefulWidget {
   @override
@@ -16,6 +17,9 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
   double _animationValue = 0.0;
 
   double discoBallAngle = 0.0;
+
+  // Add selected difficulty state
+  DifficultyLevel selectedDifficulty = DifficultyLevel.easy;
 
   @override
   void initState() {
@@ -39,6 +43,7 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
     }
 
     _controller.addListener(() {
+      if (!mounted) return; // Prevent setState calls after dispose
       _animationValue = _controller.value;
       discoBallAngle = _animationValue * 2 * pi * 0.1;
 
@@ -55,7 +60,7 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
       }
 
       if ((_controller.value * 10).floor() % 1 == 0) {
-        if (mounted) setState(() {});
+        setState(() {});
       }
     });
   }
@@ -72,361 +77,469 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black,
-                  Colors.deepPurple.shade900.withOpacity(0.5),
-                  Colors.black,
-                ],
-              ),
-            ),
-          ),
-          CustomPaint(
-            painter: DiscoPerspectiveFloorPainter(_animationValue),
-            size: Size.infinite,
-          ),
-          CustomPaint(
-            painter: DiscoBallRaysPainter(_discoBallRays),
-            size: Size.infinite,
-          ),
-          CustomPaint(
-            painter: DiscoFlarePainter(_discoFlares),
-            size: Size.infinite,
-          ),
-          CustomPaint(
-            painter: DiscoSpotsPainter(_discoSpots, _animationValue),
-            size: Size.infinite,
-          ),
-          Positioned(
-            top: -50,
-            left: size.width / 2 - 50,
-            child: Transform.rotate(
-              angle: discoBallAngle,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    colors: [
-                      Colors.white,
-                      Color(0xFFCCCCCC),
-                      Color(0xFF999999),
-                    ],
-                    stops: [0.0, 0.5, 1.0],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.5),
-                      spreadRadius: 4,
-                      blurRadius: 15,
-                    ),
+      body: SizedBox(
+        // Set explicit size for the container to prevent infinite size
+        height: size.height,
+        width: size.width,
+        child: Stack(
+          children: [
+            // Background container
+            Container(
+              height: size.height,
+              width: size.width,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black,
+                    Colors.deepPurple.shade900.withOpacity(0.5),
+                    Colors.black,
                   ],
                 ),
-                child: CustomPaint(
-                  painter: DiscoBallFacetsPainter(),
-                ),
               ),
             ),
-          ),
-          Positioned(
-            top: 0,
-            left: size.width / 2 - 1,
-            width: 2,
-            height: 50,
-            child: Container(
-              color: Colors.grey[600],
-            ),
-          ),
-          Positioned(
-            top: size.height * 0.4,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Colors.purpleAccent.withOpacity(0.3),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+            
+            // Constrained CustomPaint widgets
+            SizedBox(
+              height: size.height,
+              width: size.width, 
+              child: CustomPaint(
+                painter: DiscoPerspectiveFloorPainter(_animationValue),
               ),
             ),
-          ),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Transform.rotate(
-                  angle: -discoBallAngle,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const RadialGradient(
-                        colors: [
-                          Colors.white,
-                          Color(0xFFCCCCCC),
-                          Color(0xFF999999),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withOpacity(0.5),
-                          spreadRadius: 2,
-                          blurRadius: 8,
-                        ),
+            SizedBox(
+              height: size.height,
+              width: size.width,
+              child: CustomPaint(
+                painter: DiscoBallRaysPainter(_discoBallRays),
+              ),
+            ),
+            SizedBox(
+              height: size.height,
+              width: size.width,
+              child: CustomPaint(
+                painter: DiscoFlarePainter(_discoFlares),
+              ),
+            ),
+            SizedBox(
+              height: size.height,
+              width: size.width,
+              child: CustomPaint(
+                painter: DiscoSpotsPainter(_discoSpots, _animationValue),
+              ),
+            ),
+            
+            // Disco ball and hanging string
+            Positioned(
+              top: -50,
+              left: size.width / 2 - 50,
+              child: Transform.rotate(
+                angle: discoBallAngle,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const RadialGradient(
+                      colors: [
+                        Colors.white,
+                        Color(0xFFCCCCCC),
+                        Color(0xFF999999),
                       ],
+                      stops: [0.0, 0.5, 1.0],
                     ),
-                  ),
-                ),
-                SizedBox(height: 20),
-                Transform(
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001)
-                    ..rotateX(0.1 * sin(_controller.value * 2 * pi * 0.2))
-                    ..rotateY(0.1 * cos(_controller.value * 2 * pi * 0.2)),
-                  alignment: Alignment.center,
-                  child: Column(
-                    children: [
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Text(
-                            "MATH DDR",
-                            style: TextStyle(
-                              fontSize: 85,
-                              fontWeight: FontWeight.bold,
-                              foreground: Paint()
-                                ..style = PaintingStyle.stroke
-                                ..strokeWidth = 25
-                                ..color = Colors.pinkAccent.withOpacity(0.1),
-                            ),
-                          ),
-                          Text(
-                            "MATH DDR",
-                            style: TextStyle(
-                              fontSize: 82,
-                              fontWeight: FontWeight.bold,
-                              foreground: Paint()
-                                ..style = PaintingStyle.stroke
-                                ..strokeWidth = 20
-                                ..color = Colors.pinkAccent.withOpacity(0.2),
-                            ),
-                          ),
-                          Text(
-                            "MATH DDR",
-                            style: TextStyle(
-                              fontSize: 78,
-                              fontWeight: FontWeight.bold,
-                              foreground: Paint()
-                                ..style = PaintingStyle.stroke
-                                ..strokeWidth = 15
-                                ..color = Colors.pinkAccent.withOpacity(0.3),
-                            ),
-                          ),
-                          Text(
-                            "MATH DDR",
-                            style: TextStyle(
-                              fontSize: 72,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.pinkAccent,
-                              shadows: [
-                                Shadow(
-                                  blurRadius: 15.0,
-                                  color: Colors.pinkAccent.withOpacity(0.7),
-                                  offset: Offset(0, 0),
-                                ),
-                                Shadow(
-                                  blurRadius: 30.0,
-                                  color: Colors.pinkAccent.withOpacity(0.5),
-                                  offset: Offset(0, 0),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Text(
-                            "SIMULATOR",
-                            style: TextStyle(
-                              fontSize: 58,
-                              fontWeight: FontWeight.bold,
-                              foreground: Paint()
-                                ..style = PaintingStyle.stroke
-                                ..strokeWidth = 15
-                                ..color = Colors.purpleAccent.withOpacity(0.15),
-                            ),
-                          ),
-                          Text(
-                            "SIMULATOR",
-                            style: TextStyle(
-                              fontSize: 55,
-                              fontWeight: FontWeight.bold,
-                              foreground: Paint()
-                                ..style = PaintingStyle.stroke
-                                ..strokeWidth = 10
-                                ..color = Colors.purpleAccent.withOpacity(0.2),
-                            ),
-                          ),
-                          Text(
-                            "SIMULATOR",
-                            style: TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purpleAccent,
-                              shadows: [
-                                Shadow(
-                                  blurRadius: 10.0,
-                                  color: Colors.purpleAccent.withOpacity(0.7),
-                                  offset: Offset(0, 0),
-                                ),
-                                Shadow(
-                                  blurRadius: 20.0,
-                                  color: Colors.purpleAccent.withOpacity(0.5),
-                                  offset: Offset(0, 0),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.5),
+                        spreadRadius: 4,
+                        blurRadius: 15,
                       ),
                     ],
                   ),
+                  child: CustomPaint(
+                    painter: DiscoBallFacetsPainter(),
+                  ),
                 ),
-                SizedBox(height: 80),
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.purpleAccent.withOpacity(0.3 + 0.2 * sin(_controller.value * 2 * pi * 0.5)),
-                            blurRadius: 15 + 10 * sin(_controller.value * 2 * pi * 0.5),
-                            spreadRadius: 3 + 2 * sin(_controller.value * 2 * pi * 0.5),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: size.width / 2 - 1,
+              width: 2,
+              height: 50,
+              child: Container(
+                color: Colors.grey[600],
+              ),
+            ),
+            
+            // Main content - use SingleChildScrollView here
+            SingleChildScrollView(
+              child: SizedBox(
+                width: size.width,
+                // Don't constrain the height, let it scroll
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(height: 80), // Add padding at top
+                    
+                    // Disco ball mini model
+                    Transform.rotate(
+                      angle: -discoBallAngle,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const RadialGradient(
+                            colors: [
+                              Colors.white,
+                              Color(0xFFCCCCCC),
+                              Color(0xFF999999),
+                            ],
                           ),
-                          BoxShadow(
-                            color: Colors.pinkAccent.withOpacity(0.2 + 0.1 * cos(_controller.value * 2 * pi * 0.3)),
-                            blurRadius: 20,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      ),
-                      child: child,
-                    );
-                  },
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => DDRSimulator()),
-                      );
-                    },
-                    child: Container(
-                      width: 220,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.purpleAccent,
-                            Colors.pinkAccent,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.5),
+                              spreadRadius: 2,
+                              blurRadius: 8,
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(35),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.5),
-                          width: 2,
-                        ),
                       ),
-                      child: Center(
-                        child: Text(
-                          "START GAME",
+                    ),
+                    
+                    // Title elements with Transform
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          "MATH DDR",
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 85,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 25
+                              ..color = Colors.pinkAccent.withOpacity(0.1),
+                          ),
+                        ),
+                        Text(
+                          "MATH DDR",
+                          style: TextStyle(
+                            fontSize: 82,
+                            fontWeight: FontWeight.bold,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 20
+                              ..color = Colors.pinkAccent.withOpacity(0.2),
+                          ),
+                        ),
+                        Text(
+                          "MATH DDR",
+                          style: TextStyle(
+                            fontSize: 78,
+                            fontWeight: FontWeight.bold,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 15
+                              ..color = Colors.pinkAccent.withOpacity(0.3),
+                          ),
+                        ),
+                        Text(
+                          "MATH DDR",
+                          style: TextStyle(
+                            fontSize: 72,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.pinkAccent,
                             shadows: [
                               Shadow(
-                                color: Colors.black,
-                                offset: Offset(1, 1),
-                                blurRadius: 2,
+                                blurRadius: 15.0,
+                                color: Colors.pinkAccent.withOpacity(0.7),
+                                offset: Offset(0, 0),
+                              ),
+                              Shadow(
+                                blurRadius: 30.0,
+                                color: Colors.pinkAccent.withOpacity(0.5),
+                                offset: Offset(0, 0),
                               ),
                             ],
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-                ),
-                SizedBox(height: 50),
-                Container(
-                  width: 500,
-                  padding: EdgeInsets.all(25),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.purpleAccent.withOpacity(0.5),
-                      width: 2,
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          "SIMULATOR",
+                          style: TextStyle(
+                            fontSize: 58,
+                            fontWeight: FontWeight.bold,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 15
+                              ..color = Colors.purpleAccent.withOpacity(0.15),
+                          ),
+                        ),
+                        Text(
+                          "SIMULATOR",
+                          style: TextStyle(
+                            fontSize: 55,
+                            fontWeight: FontWeight.bold,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 10
+                              ..color = Colors.purpleAccent.withOpacity(0.2),
+                          ),
+                        ),
+                        Text(
+                          "SIMULATOR",
+                          style: TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purpleAccent,
+                            shadows: [
+                              Shadow(
+                                blurRadius: 10.0,
+                                color: Colors.purpleAccent.withOpacity(0.7),
+                                offset: Offset(0, 0),
+                              ),
+                              Shadow(
+                                blurRadius: 20.0,
+                                color: Colors.purpleAccent.withOpacity(0.5),
+                                offset: Offset(0, 0),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purpleAccent.withOpacity(0.2),
-                        blurRadius: 15,
-                        spreadRadius: 1,
+                    
+                    SizedBox(height: 80),
+                    
+                    // Difficulty selection container
+                    Container(
+                      width: 400,
+                      padding: EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.purpleAccent.withOpacity(0.5),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.purpleAccent.withOpacity(0.2),
+                            blurRadius: 15,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "How to Play:",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(
-                              color: Colors.purpleAccent.withOpacity(0.7),
-                              offset: Offset(0, 0),
-                              blurRadius: 10,
+                      child: Column(
+                        children: [
+                          Text(
+                            "Select Difficulty",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
-                          ],
+                          ),
+                          SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildDifficultyButton(DifficultyLevel.easy, "Easy", Colors.green),
+                              _buildDifficultyButton(DifficultyLevel.medium, "Medium", Colors.amber),
+                              _buildDifficultyButton(DifficultyLevel.hard, "Hard", Colors.redAccent),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    SizedBox(height: 40),
+                    
+                    // Start game button
+                    AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.purpleAccent.withOpacity(0.3 + 0.2 * sin(_controller.value * 2 * pi * 0.5)),
+                                blurRadius: 15 + 10 * sin(_controller.value * 2 * pi * 0.5),
+                                spreadRadius: 3 + 2 * sin(_controller.value * 2 * pi * 0.5),
+                              ),
+                              BoxShadow(
+                                color: Colors.pinkAccent.withOpacity(0.2 + 0.1 * cos(_controller.value * 2 * pi * 0.3)),
+                                blurRadius: 20,
+                                spreadRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: child,
+                        );
+                      },
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (context) => DDRSimulator(
+                              initialDifficulty: selectedDifficulty,
+                            )),
+                          );
+                        },
+                        child: Container(
+                          width: 220,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.purpleAccent,
+                                Colors.pinkAccent,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(35),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.5),
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              "START GAME",
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black,
+                                    offset: Offset(1, 1),
+                                    blurRadius: 2,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      SizedBox(height: 20),
-                      _buildInstructionItem("Solve the math equation"),
-                      _buildInstructionItem("Hit arrows with the correct answer"),
-                      _buildInstructionItem("Use WASD keys to hit targets"),
-                      _buildInstructionItem("Perfect timing = 10% speed increase"),
-                      _buildInstructionItem("Good timing = 2% speed increase"),
-                      _buildInstructionItem("Wrong answers break your combo"),
-                    ],
-                  ),
+                    ),
+                    
+                    SizedBox(height: 50),
+                    
+                    // How to play container
+                    Container(
+                      width: min(500, size.width * 0.9),
+                      padding: EdgeInsets.all(25),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.purpleAccent.withOpacity(0.5),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.purpleAccent.withOpacity(0.2),
+                            blurRadius: 15,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "How to Play:",
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.purpleAccent.withOpacity(0.7),
+                                  offset: Offset(0, 0),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          _buildInstructionItem("Solve the math equation"),
+                          _buildInstructionItem("Hit arrows with the correct answer"),
+                          _buildInstructionItem("Use WASD keys to hit targets"),
+                          _buildInstructionItem("Perfect timing = more points"),
+                          _buildInstructionItem("Wrong answers break your combo"),
+                          SizedBox(height: 20),
+                          Center(
+                            child: Text(
+                              "Press ESC anytime to return to this screen",
+                              style: TextStyle(
+                                fontSize: 16, 
+                                color: Colors.white70,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    SizedBox(height: 40), // Bottom padding
+                  ],
                 ),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDifficultyButton(DifficultyLevel difficulty, String label, Color color) {
+    bool isSelected = selectedDifficulty == difficulty;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedDifficulty = difficulty;
+        });
+      },
+      child: Container(
+        width: 110,
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.3) : Colors.black45,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.3),
+            width: isSelected ? 3 : 1,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: color.withOpacity(0.5),
+              blurRadius: 10,
+              spreadRadius: 1,
+            )
+          ] : [],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? color : Colors.white70,
             ),
           ),
-        ],
+        ),
       ),
     );
   }

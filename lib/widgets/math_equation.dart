@@ -5,18 +5,20 @@ class MathEquation extends StatelessWidget {
   final int firstNumber;
   final int secondNumber;
   final MathOperation operation;
+  final String? customText;
 
   const MathEquation({
     Key? key,
     required this.firstNumber,
     required this.secondNumber,
     this.operation = MathOperation.addition,
+    this.customText,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // Get operation symbol
-    String operationSymbol = operation == MathOperation.addition ? "+" : "×";
+    // If customText is provided, use that instead of generating from numbers
+    String displayText = customText ?? _getEquationText();
     
     return Container(
       padding: EdgeInsets.all(20),
@@ -42,19 +44,19 @@ class MathEquation extends StatelessWidget {
             "SOLVE",
             style: TextStyle(
               color: Colors.white70,
-              fontSize: 24,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 20),
+          SizedBox(height: 15),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                "$firstNumber $operationSymbol $secondNumber = ?",
+                displayText,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 60, // Larger equation text
+                  fontSize: 40,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -63,5 +65,26 @@ class MathEquation extends StatelessWidget {
         ],
       ),
     );
+  }
+  
+  String _getEquationText() {
+    String operationSymbol;
+    
+    switch (operation) {
+      case MathOperation.addition:
+        operationSymbol = "+";
+        break;
+      case MathOperation.subtraction:
+        operationSymbol = "-";
+        break;
+      case MathOperation.multiplication:
+        operationSymbol = "×";
+        break;
+      case MathOperation.division:
+        operationSymbol = "÷";
+        break;
+    }
+    
+    return "$firstNumber $operationSymbol $secondNumber = ?";
   }
 }
