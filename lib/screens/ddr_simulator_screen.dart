@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
-import 'package:just_audio/just_audio.dart'; // Add this import for audio playback
+import 'package:just_audio/just_audio.dart';
 
 import '../models/arrow.dart';
 import '../models/enums.dart';
@@ -688,7 +688,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
       children: [
         // Game area - narrow and at leftmost side
         Container(
-          width: 500, // Fixed width makes it narrower
+          width: 550, // Fixed width makes it narrower
           padding: EdgeInsets.all(20),
           child: _buildGameArea(),
         ),
@@ -700,7 +700,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
         
         // Stats section - at rightmost side
         Container(
-          width: 300, // Fixed width for stats panel
+          width: 400, // Fixed width for stats panel
           padding: EdgeInsets.all(20),
           child: Column(
             children: [
@@ -819,47 +819,6 @@ class _DDRSimulatorState extends State<DDRSimulator>
     );
   }
 
-  Widget _buildWideLayout() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Left stats panel
-        Container(
-          width: 300,
-          padding: EdgeInsets.all(20),
-          child: _buildStatsPanel(),
-        ),
-        
-        // Center area (game + equation)
-        Expanded(
-          flex: 3,
-          child: Column(
-            children: [
-              if (widget.gameMode == GameMode.math)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: _buildCompactEquation(),
-                ),
-              Expanded(
-                child: _buildGameArea(),
-              ),
-            ],
-          ),
-        ),
-        
-        // Video for math mode only - takes full height
-        if (widget.gameMode == GameMode.math)
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: EdgeInsets.all(20),
-              child: _buildFullVideoPlayer(),
-            ),
-          ),
-      ],
-    );
-  }
-
   Widget _buildNarrowLayout() {
     return Column(
       children: [
@@ -884,7 +843,8 @@ class _DDRSimulatorState extends State<DDRSimulator>
   // Compact equation card for math mode
   Widget _buildCompactEquation() {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24), // Reduced horizontal padding
+      width: double.infinity, // Take full available width
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -920,20 +880,23 @@ class _DDRSimulatorState extends State<DDRSimulator>
                 ),
               ],
             ),
-            child: Text(
-              questionText,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 42,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                shadows: [
-                  Shadow(
-                    color: Colors.purpleAccent.withOpacity(0.7),
-                    blurRadius: 8,
-                    offset: Offset(1, 1),
-                  ),
-                ],
+            child: FittedBox(  // Use FittedBox to maximize text size within container
+              fit: BoxFit.scaleDown,
+              child: Text(
+                questionText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 48, // Increased from 42 to 64
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      color: Colors.purpleAccent.withOpacity(0.7),
+                      blurRadius: 8,
+                      offset: Offset(1, 1),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -948,7 +911,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.purpleAccent.withOpacity(0.2),
+            color: Colors.deepPurple.withOpacity(0.2),
             blurRadius: 15,
             spreadRadius: 1,
           ),
@@ -958,6 +921,11 @@ class _DDRSimulatorState extends State<DDRSimulator>
       child: Stack(
         fit: StackFit.expand,
         children: [
+          // Background color to match the app background before video loads
+          Container(
+            color: Colors.black,
+          ),
+          
           // Video component
           _isVideoInitialized && _videoController.value.isInitialized
             ? AspectRatio(
@@ -976,7 +944,26 @@ class _DDRSimulatorState extends State<DDRSimulator>
                 child: CircularProgressIndicator(color: Colors.purpleAccent),
               ),
             
-          // Gradient overlay for better blending
+          // Enhanced gradient overlay for better blending with game UI
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.7),
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.7),
+                  ],
+                  stops: [0.0, 0.15, 0.85, 1.0],
+                ),
+              ),
+            ),
+          ),
+          
+          // Side gradients for seamless edge blending
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -984,11 +971,30 @@ class _DDRSimulatorState extends State<DDRSimulator>
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withOpacity(0.8),
                     Colors.transparent,
-                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.8),
                   ],
+                  stops: [0.0, 0.05, 0.95, 1.0],
                 ),
+              ),
+            ),
+          ),
+          
+          // Add subtle neon grid effect to match the game's theme
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.1,
+              child: AnimatedBuilder(
+                animation: _rotateController,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: NeonGridPainter(
+                      progress: _rotateController.value,
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -1162,17 +1168,6 @@ class _DDRSimulatorState extends State<DDRSimulator>
                       color: Colors.black45,
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(color: Colors.white24),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.keyboard, size: 16, color: Colors.white70),
-                        SizedBox(width: 8),
-                        Text(
-                          "WASD to hit arrows",
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      ],
                     ),
                   ),
                 ),
@@ -1426,13 +1421,6 @@ class _DDRSimulatorState extends State<DDRSimulator>
                         border: Border.all(
                           color: Colors.white24,
                           width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        "Use WASD keys to hit targets",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
                         ),
                       ),
                     ),
