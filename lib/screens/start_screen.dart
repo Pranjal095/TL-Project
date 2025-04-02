@@ -458,7 +458,6 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                     ),
                     
                     SizedBox(height: 50),
-                    
                     // How to play container
                     Container(
                       width: min(500, size.width * 0.9),
@@ -497,11 +496,20 @@ class _StartScreenState extends State<StartScreen> with SingleTickerProviderStat
                             ),
                           ),
                           SizedBox(height: 20),
-                          _buildInstructionItem("Solve the math equation"),
-                          _buildInstructionItem("Hit arrows with the correct answer"),
-                          _buildInstructionItem("Use WASD keys to hit targets"),
-                          _buildInstructionItem("Perfect timing = more points"),
-                          _buildInstructionItem("Wrong answers break your combo"),
+                          // Conditionally show instructions based on selected mode
+                          if (selectedGameMode == GameMode.math) ...[
+                            _buildInstructionItem("Solve the math equation"),
+                            _buildInstructionItem("Hit arrows with the correct answer"),
+                            _buildInstructionItem("Use arrow keys to hit targets"),
+                            _buildInstructionItem("Perfect timing = more points"),
+                            _buildInstructionItem("Wrong answers break your combo"),
+                          ] else ...[
+                            _buildInstructionItem("Hit the arrows as they reach the target"),
+                            _buildInstructionItem("Use arrow keys to hit targets"),
+                            _buildInstructionItem("Perfect timing = more points"),
+                            _buildInstructionItem("Build combos for higher scores"),
+                            _buildInstructionItem("Don't miss to keep your combo"),
+                          ],
                           SizedBox(height: 20),
                           Center(
                             child: Text(

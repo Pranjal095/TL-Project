@@ -143,10 +143,10 @@ class _DDRSimulatorState extends State<DDRSimulator>
 
   Future<void> _initializeVideoAndAudio() async {
     try {
-      // Choose video based on random selection
-      final random = Random();
-      final videoOptions = ['dance.mp4', 'dog.mp4'];
-      final selectedVideo = videoOptions[random.nextInt(videoOptions.length)];
+      final videoOptions = ['dancer.mp4', 'dog.mp4'];
+      final selectedVideo = videoOptions[widget.gameMode == GameMode.math 
+          ? 1
+          : 0];
       
       _videoController = VideoPlayerController.asset('assets/$selectedVideo');
 
@@ -274,17 +274,10 @@ class _DDRSimulatorState extends State<DDRSimulator>
           firstNumber = random.nextInt(9) + 1;
           secondNumber = random.nextInt(9) + 1;
 
-          currentOperation = random.nextBool()
-              ? MathOperation.addition
-              : MathOperation.multiplication;
+          currentOperation = MathOperation.addition;
 
-          if (currentOperation == MathOperation.addition) {
-            correctAnswer = firstNumber + secondNumber;
-            questionText = "$firstNumber + $secondNumber = ?";
-          } else {
-            correctAnswer = firstNumber * secondNumber;
-            questionText = "$firstNumber × $secondNumber = ?";
-          }
+          correctAnswer = firstNumber + secondNumber;
+          questionText = "$firstNumber + $secondNumber = ?";
           break;
 
         case DifficultyLevel.medium:
@@ -631,26 +624,94 @@ class _DDRSimulatorState extends State<DDRSimulator>
               ),
             ),
             SafeArea(
-              child: Column(
-                children: [
-                  _buildSimpleStatsBar(),
-                  _buildEquationDisplay(),
-                  Expanded(
-                    child: isWideScreen
-                        ? _buildWideLayout()
-                        : _buildNarrowLayout(),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 80,
-              right: 20,
-              child: _buildSpeedMeter(),
+              child: isWideScreen
+                ? _buildGameModeLayout()
+                : _buildNarrowLayout(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGameModeLayout() {
+    // Choose layout based on game mode
+    return widget.gameMode == GameMode.math
+        ? _buildMathModeLayout()
+        : _buildStandardModeLayout();
+  }
+
+  Widget _buildMathModeLayout() {
+    // Wide layout optimized for math mode with wider game area and equation
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left stats panel
+        Container(
+          width: 280,
+          padding: EdgeInsets.all(20),
+          child: _buildStatsPanel(),
+        ),
+        
+        // Center area (game + equation) - wider for math mode
+        Expanded(
+          flex: 4,
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+                child: _buildCompactEquation(),
+              ),
+              Expanded(
+                child: _buildGameArea(),
+              ),
+            ],
+          ),
+        ),
+        
+        // Video area - slightly narrower
+        Expanded(
+          flex: 2,
+          child: Container(
+            padding: EdgeInsets.all(20),
+            child: _buildFullVideoPlayer(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStandardModeLayout() {
+    // Layout optimized for standard mode with game area at left and stats at right
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Game area - narrow and at leftmost side
+        Container(
+          width: 500, // Fixed width makes it narrower
+          padding: EdgeInsets.all(20),
+          child: _buildGameArea(),
+        ),
+        
+        // Middle spacer to push content to edges
+        Expanded(
+          child: Container(),
+        ),
+        
+        // Stats section - at rightmost side
+        Container(
+          width: 300, // Fixed width for stats panel
+          padding: EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Rest of the stats
+              Expanded(
+                child: _buildStatsPanel(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -758,308 +819,43 @@ class _DDRSimulatorState extends State<DDRSimulator>
     );
   }
 
-  Widget _buildSimpleStatsBar() {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            border: Border(
-              bottom: BorderSide(
-                color: Colors.purpleAccent.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildDifficultyBadge(currentDifficulty),
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.purpleAccent.withOpacity(_glowAnimation.value * 0.5),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star, color: Colors.amberAccent, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          score.toString(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: combo > 0 ? Colors.greenAccent : Colors.white24,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      "COMBO",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      combo.toString(),
-                      style: TextStyle(
-                        color: combo > 0 ? Colors.greenAccent : Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEquationDisplay() {
-    if (widget.gameMode == GameMode.classic) {
-      return Container(
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: _buildDanceBanner(),
-      );
-    } else {
-      return Container(
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: _buildMathEquationCard(),
-      );
-    }
-  }
-
-  Widget _buildDanceBanner() {
-    return Transform(
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.001)
-        ..rotateX(0.05)
-        ..rotateY(-0.05),
-      alignment: Alignment.center,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: 25, horizontal: 20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue.withOpacity(0.7),
-              Colors.black.withOpacity(0.9),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blueAccent.withOpacity(0.5),
-              blurRadius: 20,
-              spreadRadius: 1,
-              offset: Offset(5, 5),
-            ),
-          ],
-          border: Border.all(
-            color: Colors.blueAccent.withOpacity(0.7),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "DANCE MODE",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 4,
-              ),
-            ),
-            SizedBox(height: 20),
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blueAccent.withOpacity(_glowAnimation.value * 0.3),
-                        blurRadius: 20,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: child,
-                );
-              },
-              child: Text(
-                "FOLLOW THE RHYTHM!",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      color: Colors.blueAccent.withOpacity(0.7),
-                      blurRadius: 10,
-                      offset: Offset(2, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMathEquationCard() {
-    return Transform(
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.001)
-        ..rotateX(0.05)
-        ..rotateY(-0.05),
-      alignment: Alignment.center,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: 25, horizontal: 20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.deepPurple.withOpacity(0.7),
-              Colors.black.withOpacity(0.9),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purpleAccent.withOpacity(0.5),
-              blurRadius: 20,
-              spreadRadius: 1,
-              offset: Offset(5, 5),
-            ),
-          ],
-          border: Border.all(
-            color: Colors.purpleAccent.withOpacity(0.7),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "SOLVE",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 4,
-              ),
-            ),
-            SizedBox(height: 20),
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purpleAccent.withOpacity(_glowAnimation.value * 0.3),
-                        blurRadius: 20,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: child,
-                );
-              },
-              child: Text(
-                questionText,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 52,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      color: Colors.purpleAccent.withOpacity(0.7),
-                      blurRadius: 10,
-                      offset: Offset(2, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildWideLayout() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Left stats panel
         Container(
           width: 300,
           padding: EdgeInsets.all(20),
           child: _buildStatsPanel(),
         ),
+        
+        // Center area (game + equation)
         Expanded(
           flex: 3,
-          child: Center(
-            child: _buildGameArea(),
+          child: Column(
+            children: [
+              if (widget.gameMode == GameMode.math)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: _buildCompactEquation(),
+                ),
+              Expanded(
+                child: _buildGameArea(),
+              ),
+            ],
           ),
         ),
-        Container(
-          width: 300,
-          padding: EdgeInsets.all(20),
-          child: _buildDetailedStatsPanel(),
-        ),
+        
+        // Video for math mode only - takes full height
+        if (widget.gameMode == GameMode.math)
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: EdgeInsets.all(20),
+              child: _buildFullVideoPlayer(),
+            ),
+          ),
       ],
     );
   }
@@ -1067,6 +863,11 @@ class _DDRSimulatorState extends State<DDRSimulator>
   Widget _buildNarrowLayout() {
     return Column(
       children: [
+        if (widget.gameMode == GameMode.math)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            child: _buildCompactEquation(),
+          ),
         Expanded(
           flex: 5,
           child: _buildGameArea(),
@@ -1080,121 +881,162 @@ class _DDRSimulatorState extends State<DDRSimulator>
     );
   }
 
-  Widget _buildSpeedMeter() {
-    return Transform(
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.001)
-        ..rotateX(0.1)
-        ..rotateY(-0.1),
-      alignment: Alignment.center,
-      child: Container(
-        width: 120,
-        padding: EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purpleAccent.withOpacity(0.5),
-              blurRadius: 15,
-              spreadRadius: 2,
-              offset: Offset(3, 3),
-            ),
+  // Compact equation card for math mode
+  Widget _buildCompactEquation() {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.deepPurple.withOpacity(0.7),
+            Colors.black.withOpacity(0.9),
           ],
-          border: Border.all(
-            color: Colors.purpleAccent.withOpacity(0.7),
-            width: 1,
-          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "SPEED",
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.2,
-              ),
-            ),
-            SizedBox(height: 10),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  height: 80,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.black,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purpleAccent.withOpacity(0.3),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.all(8),
-                  child: CustomPaint(
-                    painter: SpeedMeterPainter(
-                      progress: arrowSpeedMultiplier / _getMaxSpeedMultiplier(),
-                      baseColor: Colors.purpleAccent,
-                    ),
-                    child: Center(
-                      child: Text(
-                        "${arrowSpeedMultiplier.toStringAsFixed(1)}x",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purpleAccent.withOpacity(0.3),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+        border: Border.all(
+          color: Colors.purpleAccent.withOpacity(0.5),
+          width: 2,
+        ),
+      ),
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.purpleAccent.withOpacity(_glowAnimation.value * 0.2),
+                  blurRadius: 12,
+                  spreadRadius: 0,
                 ),
               ],
             ),
-          ],
-        ),
+            child: Text(
+              questionText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 42,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: [
+                  Shadow(
+                    color: Colors.purpleAccent.withOpacity(0.7),
+                    blurRadius: 8,
+                    offset: Offset(1, 1),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDifficultyBadge(DifficultyLevel difficulty) {
-    String label;
-    Color color;
-
-    switch (difficulty) {
-      case DifficultyLevel.easy:
-        label = "Easy";
-        color = Colors.green;
-        break;
-      case DifficultyLevel.medium:
-        label = "Medium";
-        color = Colors.amber;
-        break;
-      case DifficultyLevel.hard:
-        label = "Hard";
-        color = Colors.redAccent;
-        break;
-    }
-
+  Widget _buildFullVideoPlayer() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color, width: 1),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purpleAccent.withOpacity(0.2),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+        ],
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-        ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Video component
+          _isVideoInitialized && _videoController.value.isInitialized
+            ? AspectRatio(
+                aspectRatio: _videoController.value.aspectRatio,
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(
+                    width: _videoController.value.size.width,
+                    height: _videoController.value.size.height,
+                    child: VideoPlayer(_videoController),
+                  ),
+                ),
+              )
+            : Center(
+                child: CircularProgressIndicator(color: Colors.purpleAccent),
+              ),
+            
+          // Gradient overlay for better blending
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.4),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Simple video controls
+          Positioned(
+            bottom: 15,
+            left: 0,
+            right: 0,
+            child: _isVideoInitialized ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _isVideoPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                  iconSize: 32,
+                  onPressed: () {
+                    setState(() {
+                      if (_isVideoPlaying) {
+                        _videoController.pause();
+                      } else {
+                        _videoController.play();
+                      }
+                    });
+                  },
+                ),
+                SizedBox(width: 20),
+                IconButton(
+                  icon: Icon(
+                    _audioVolume == 0 
+                        ? Icons.volume_off 
+                        : (_audioVolume < 0.5 ? Icons.volume_down : Icons.volume_up),
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                  iconSize: 32,
+                  onPressed: () {
+                    setState(() {
+                      _audioVolume = _audioVolume > 0 ? 0 : 0.5;
+                      _audioPlayer.setVolume(_audioVolume);
+                    });
+                  },
+                ),
+              ],
+            ) : SizedBox(),
+          ),
+        ],
       ),
     );
   }
@@ -1335,181 +1177,6 @@ class _DDRSimulatorState extends State<DDRSimulator>
                   ),
                 ),
               ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailedStatsPanel() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.black54,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.purpleAccent.withOpacity(0.5),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "PERFORMANCE",
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-            ),
-          ),
-          Divider(color: Colors.white24),
-          SizedBox(height: 10),
-          _buildPerformanceMetric("PERFECT HITS", 0.7, Colors.greenAccent),
-          SizedBox(height: 12),
-          _buildPerformanceMetric("GOOD HITS", 0.4, Colors.yellowAccent),
-          SizedBox(height: 12),
-          _buildPerformanceMetric("MISSES", 0.2, Colors.redAccent),
-          Spacer(),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black45,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.purpleAccent.withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Text(
-                  "CURRENT RATING",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 8),
-                AnimatedBuilder(
-                  animation: _pulseController,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: child,
-                    );
-                  },
-                  child: buildRatingBadge(currentRating),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 20),
-          if (_isVideoInitialized)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _isVideoPlaying ? Icons.pause_circle_outline : Icons.play_circle_outline,
-                    color: Colors.white70,
-                  ),
-                  iconSize: 32,
-                  onPressed: () {
-                    setState(() {
-                      if (_isVideoPlaying) {
-                        _videoController.pause();
-                      } else {
-                        _videoController.play();
-                      }
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.replay_circle_filled_outlined,
-                    color: Colors.white70,
-                  ),
-                  iconSize: 32,
-                  onPressed: () {
-                    setState(() {
-                      _videoController.seekTo(Duration.zero);
-                      _videoController.play();
-                    });
-                  },
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPerformanceMetric(String label, double value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-          ),
-        ),
-        SizedBox(height: 6),
-        Stack(
-          children: [
-            Container(
-              height: 8,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.black38,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Container(
-                  height: 8,
-                  width: 250 * value,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        color,
-                        color.withOpacity(0.7),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(_glowAnimation.value * 0.5),
-                        blurRadius: 8,
-                        spreadRadius: 0,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            "${(value * 100).toInt()}%",
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
             ),
           ),
         ),
