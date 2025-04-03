@@ -249,7 +249,7 @@ class _DDRSimulatorState extends State<DDRSimulator>
   void _handleKeyEvent(RawKeyEvent event) {
     if (event is RawKeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.escape) {
-        Navigator.of(context).pop();
+        _showExitConfirmation();
         return;
       }
 
@@ -263,6 +263,87 @@ class _DDRSimulatorState extends State<DDRSimulator>
         checkHit(Direction.right);
       }
     }
+  }
+
+  void _showExitConfirmation() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User must tap a button to close dialog
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: Colors.black87,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Colors.purpleAccent.withOpacity(0.5), width: 2),
+            ),
+            title: Text(
+              'Exit Game?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            content: Text(
+              'Are you sure you want to leave the game? Your progress will be lost.',
+              style: TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      side: BorderSide(color: Colors.white30),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close the dialog
+                    },
+                    child: Text(
+                      'CONTINUE PLAYING',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.redAccent.withOpacity(0.2),
+                      side: BorderSide(color: Colors.redAccent.withOpacity(0.5)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    ),
+                    onPressed: () {
+                      // First close the dialog
+                      Navigator.of(context).pop();
+                      
+                      // Stop media and clean up
+                      _videoController.pause();
+                      _audioPlayer.stop();
+                      
+                      // Navigate to home screen with named route
+                      Navigator.of(context).pushReplacementNamed('/');
+                    },
+                    child: Text(
+                      'EXIT GAME',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void generateMathEquation() {
@@ -560,6 +641,13 @@ class _DDRSimulatorState extends State<DDRSimulator>
               filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: Container(color: Colors.transparent),
             ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+            onPressed: () {
+              // Show confirmation before exiting
+              _showExitConfirmation();
+            },
           ),
           actions: [
             IconButton(
